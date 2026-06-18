@@ -1,0 +1,385 @@
+/* ──────────────────────────────────────────────────────────────────
+   Library tab — quiet mono rows of past local runs. "Ink on dark stock":
+   warm-graphite surfaces lifted by luminance, separated by hairlines.
+   Accent discipline: gold never appears here (no live element); mode is
+   neutral metadata, done is green, sample is neutral.
+   ────────────────────────────────────────────────────────────────── */
+
+.al-library {
+  max-width: 980px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-4);
+}
+
+/* ── Shared column template — head + rows align to one grid ──
+   title | mode | duration | model·engine | date | status | actions */
+.al-runhead,
+.al-runrow {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1.9fr) 7.5rem 4.5rem minmax(0, 1fr) 8.5rem 6rem auto;
+  align-items: center;
+  gap: var(--al-space-3);
+}
+
+/* ── Toolbar: search + sort + clear ── */
+.al-library__toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-3);
+}
+
+.al-runsearch {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-2);
+  padding: 0 var(--al-space-3);
+  height: 38px;
+  background: var(--al-surface);
+  border: 1px solid var(--al-hairline);
+  border-radius: var(--al-radius-ctrl);
+  transition: border-color var(--al-dur-snap) var(--al-ease-snap),
+    box-shadow var(--al-dur-snap) var(--al-ease-snap);
+}
+.al-runsearch:focus-within {
+  border-color: var(--al-hairline-strong);
+}
+.al-runsearch__icon {
+  color: var(--al-ink-muted);
+  flex-shrink: 0;
+}
+.al-runsearch__input {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  color: var(--al-ink);
+  font-family: var(--al-font-body);
+  font-size: var(--al-text-md);
+}
+.al-runsearch__input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+.al-runsearch__count {
+  font-family: var(--al-font-mono);
+  font-size: var(--al-text-xs);
+  color: var(--al-ink-faint);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+.al-runsearch__clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--al-ink-muted);
+  border-radius: var(--al-radius-chip);
+  padding: 2px;
+  transition: color var(--al-dur-snap) var(--al-ease-snap),
+    background var(--al-dur-snap) var(--al-ease-snap);
+}
+.al-runsearch__clear:hover {
+  color: var(--al-ink);
+  background: var(--al-surface-2);
+}
+
+.al-library__sort,
+.al-library__clear {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--al-space-2);
+  height: 38px;
+  padding: 0 var(--al-space-3);
+  background: var(--al-surface);
+  border: 1px solid var(--al-hairline);
+  border-radius: var(--al-radius-ctrl);
+  color: var(--al-ink-dim);
+  font-size: var(--al-text-sm);
+  white-space: nowrap;
+  transition: color var(--al-dur-snap) var(--al-ease-snap),
+    background var(--al-dur-snap) var(--al-ease-snap),
+    border-color var(--al-dur-snap) var(--al-ease-snap);
+}
+.al-library__sort:hover,
+.al-library__clear:hover {
+  color: var(--al-ink);
+  background: var(--al-surface-2);
+  border-color: var(--al-hairline-strong);
+}
+.al-library__sort-label {
+  font-family: var(--al-font-mono);
+  font-size: var(--al-text-xs);
+  letter-spacing: 0.04em;
+}
+.al-library__clear {
+  color: var(--al-ink-muted);
+}
+.al-library__clear:hover {
+  color: var(--al-error);
+  border-color: color-mix(in srgb, var(--al-error) 35%, transparent);
+}
+
+/* ── Sample note — quiet, non-alarming ── */
+.al-library__samplenote {
+  font-size: var(--al-text-sm);
+  color: var(--al-ink-muted);
+  padding: var(--al-space-2) var(--al-space-3);
+  border-left: 2px solid var(--al-hairline-strong);
+  background: var(--al-surface);
+  border-radius: 0 var(--al-radius-ctrl) var(--al-radius-ctrl) 0;
+  line-height: 1.5;
+}
+
+/* ── The list ── */
+.al-runlist {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--al-radius-panel);
+  border: 1px solid var(--al-hairline);
+  overflow: hidden;
+  background: var(--al-surface);
+}
+
+/* Column header — quiet mono caps, sits flush above the rows. */
+.al-runhead {
+  padding: var(--al-space-3) var(--al-space-4);
+  background: var(--al-surface-2);
+  border-bottom: 1px solid var(--al-hairline);
+}
+.al-runhead .al-eyebrow {
+  margin: 0;
+}
+
+/* ── Row ── */
+.al-runrow {
+  padding: var(--al-space-3) var(--al-space-4);
+  background: var(--al-surface);
+  border-bottom: 1px solid var(--al-hairline);
+  cursor: pointer;
+  position: relative;
+  transition: background var(--al-dur-snap) var(--al-ease-snap);
+}
+.al-runrow:last-child {
+  border-bottom: none;
+}
+.al-runrow:hover {
+  background: var(--al-surface-2);
+}
+.al-runrow:focus-visible {
+  outline: 2px solid var(--al-gold);
+  outline-offset: -2px;
+}
+/* Gold whisker on the active/hovered row — the only warm cue, and it's a
+   focus affordance, not decoration. */
+.al-runrow::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--al-gold);
+  opacity: 0;
+  transition: opacity var(--al-dur-snap) var(--al-ease-snap);
+}
+.al-runrow:hover::before,
+.al-runrow:focus-visible::before {
+  opacity: 0.7;
+}
+.al-runrow--sample {
+  cursor: default;
+}
+.al-runrow--sample:hover::before {
+  opacity: 0.3;
+}
+
+/* Title block */
+.al-runrow__name {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.al-runrow__title {
+  font-family: var(--al-font-display);
+  font-size: var(--al-text-lg);
+  color: var(--al-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.25;
+}
+.al-runrow__sub {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-2);
+  font-family: var(--al-font-mono);
+  font-size: var(--al-text-xs);
+  color: var(--al-ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.al-runrow__lang {
+  color: var(--al-ink-dim);
+}
+.al-runrow__dot {
+  color: var(--al-ink-faint);
+}
+.al-runrow__sep {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--al-green);
+  opacity: 0.85;
+}
+
+/* Generic mono cells */
+.al-runrow__cell {
+  font-family: var(--al-font-mono);
+  font-size: var(--al-text-xs);
+  color: var(--al-ink-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.al-runrow__dur {
+  color: var(--al-ink-dim);
+}
+.al-runrow__date {
+  color: var(--al-ink-muted);
+}
+
+.al-runrow__mode :where(.al-badge) {
+  font-family: var(--al-font-mono);
+}
+
+/* Model · engine — the trust signal */
+.al-runrow__engine {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-2);
+  font-family: var(--al-font-mono);
+  font-size: var(--al-text-xs);
+  color: var(--al-ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.al-runrow__model {
+  color: var(--al-ink-dim);
+}
+
+.al-runrow__status :where(.al-badge) {
+  white-space: nowrap;
+}
+
+/* Actions — hidden until the row is hovered or anything inside is focused.
+   On touch / no-hover they stay visible (handled below). */
+.al-runrow__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--al-space-1);
+  opacity: 0;
+  transition: opacity var(--al-dur-snap) var(--al-ease-snap);
+}
+.al-runrow:hover .al-runrow__actions,
+.al-runrow:focus-within .al-runrow__actions {
+  opacity: 1;
+}
+.al-runrow__del:hover {
+  color: var(--al-error);
+}
+
+/* Inline delete confirm */
+.al-runrow__confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--al-space-1);
+}
+.al-runrow__confirm-q {
+  font-size: var(--al-text-xs);
+  color: var(--al-error);
+  white-space: nowrap;
+  margin-right: 2px;
+}
+.al-runrow__confirm-yes {
+  color: var(--al-error);
+}
+
+@media (hover: none) {
+  .al-runrow__actions {
+    opacity: 1;
+  }
+}
+
+/* ── Empty (no matches) ── */
+.al-library__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--al-space-2);
+  text-align: center;
+  color: var(--al-ink-muted);
+  padding: var(--al-space-6) var(--al-gutter);
+  border: 1px solid var(--al-hairline);
+  border-radius: var(--al-radius-panel);
+  background: var(--al-surface);
+}
+.al-library__empty svg {
+  color: var(--al-ink-faint);
+  margin-bottom: var(--al-space-1);
+}
+.al-library__empty-title {
+  font-family: var(--al-font-display);
+  font-size: var(--al-lyric-far);
+  color: var(--al-ink-dim);
+}
+.al-library__empty-sub {
+  font-size: var(--al-text-sm);
+  color: var(--al-ink-muted);
+}
+
+/* ── Local-first footer ── */
+.al-assurance {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--al-space-2);
+  text-align: center;
+  font-size: var(--al-text-sm);
+  color: var(--al-ink-faint);
+  padding: var(--al-space-4) 0 var(--al-space-2);
+}
+.al-assurance svg {
+  color: var(--al-green);
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+/* ── Narrow window: collapse low-priority columns, keep it legible ── */
+@media (max-width: 860px) {
+  .al-runhead,
+  .al-runrow {
+    grid-template-columns: minmax(0, 1.6fr) 6.5rem 4rem auto;
+  }
+  /* hide model·engine, date, and status header/cells under the squeeze */
+  .al-runhead > :nth-child(4),
+  .al-runhead > :nth-child(5),
+  .al-runhead > :nth-child(6),
+  .al-runrow__engine,
+  .al-runrow__date,
+  .al-runrow__status {
+    display: none;
+  }
+  .al-library__sort-label,
+  .al-library__clear span {
+    display: none;
+  }
+}

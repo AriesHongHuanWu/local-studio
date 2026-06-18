@@ -1,0 +1,48 @@
+# ── Python backend ──────────────────────────────────────────────
+backend/.venv/
+backend/venv/
+**/__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+
+# Model weights / inference caches (multi-GB — downloaded on first run)
+model/
+backend/models/
+backend/out/
+*.pt
+*.onnx
+*.ckpt
+.cache/
+
+# Runtime scratch
+backend/tmp/
+backend/jobs/
+*.wav
+*.flac
+*.lrc
+*.srt
+*.ass
+
+# ── Frontend (React + Vite) ─────────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+*.tsbuildinfo
+frontend/build-override.json
+# package-lock omitted: npm's platform-specific optional deps (rollup/esbuild)
+# make a Windows-generated lock fail `npm ci` on Linux. Use `npm install`.
+package-lock.json
+
+# ── Tauri desktop shell (Rust) ──────────────────────────────────
+frontend/src-tauri/target/
+frontend/src-tauri/gen/
+# NOTE: Cargo.lock IS committed (this is an application — reproducible builds)
+
+# ── Editor / OS ─────────────────────────────────────────────────
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,0 +1,145 @@
+/* ──────────────────────────────────────────────────────────────────
+   Global reset + base type + gold focus rings + custom scrollbar +
+   reduced-motion. Depends on tokens.css being imported first.
+   ────────────────────────────────────────────────────────────────── */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--al-bg);
+  color: var(--al-ink);
+  font-family: var(--al-font-body);
+  font-size: var(--al-text-md);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "kern" 1, "liga" 1;
+  overflow: hidden; /* the AppFrame owns scroll regions */
+}
+
+#root {
+  display: flex;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  background: none;
+  border: none;
+}
+
+input,
+textarea {
+  background: none;
+  border: none;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+ul,
+ol {
+  list-style: none;
+}
+
+/* ── Gold keyboard focus ring (quality floor) ── */
+:focus { outline: none; }
+
+:focus-visible {
+  outline: 2px solid var(--al-gold);
+  outline-offset: 2px;
+  border-radius: var(--al-radius-ctrl);
+  box-shadow: 0 0 0 4px var(--al-gold-glow);
+}
+
+/* ── Custom scrollbar — quiet warm graphite ── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--al-surface-2) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--al-surface-2);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #2c2730;
+  background-clip: padding-box;
+}
+
+::selection {
+  background: var(--al-gold-glow);
+  color: var(--al-ink);
+}
+
+::placeholder {
+  color: var(--al-ink-faint);
+}
+
+/* ── Utility: visually-hidden (screen-reader-only live announcements) ── */
+.al-vh {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ── Utility: spinner ── */
+.al-spin {
+  animation: al-spin 0.9s linear infinite;
+}
+@keyframes al-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Reduced motion: kill non-essential animation ── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

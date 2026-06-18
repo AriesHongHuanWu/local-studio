@@ -1,0 +1,433 @@
+/* ══════════════════════════════════════════════════════════════════
+   Editor tab — the hero reading-playhead surface + word inspector +
+   edge-docked transport. "Ink on dark stock": warm serif document,
+   rack-focus depth-of-field, a single antique-gold sweep, event-driven
+   amber confidence. Split-speed motion: 220ms ink for focus shifts,
+   140ms snap for every editing micro-op.
+   ══════════════════════════════════════════════════════════════════ */
+
+.al-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+/* ── Top status bar ── */
+.al-editor__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--al-space-3);
+  padding: var(--al-space-3) var(--al-gutter);
+  border-bottom: 1px solid var(--al-hairline);
+  flex-shrink: 0;
+}
+.al-editor__bar-group {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-3);
+  min-width: 0;
+}
+.al-editor__hint {
+  font-family: var(--al-font-mono);
+  font-size: var(--al-text-xs);
+  letter-spacing: 0.02em;
+  color: var(--al-ink-faint);
+  white-space: nowrap;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   LyricDocument — the rack-focus editorial column
+   ══════════════════════════════════════════════════════════════════ */
+.al-doc {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 20vh var(--al-gutter) 26vh;
+  text-align: center;
+  scroll-behavior: smooth;
+  outline: none;
+}
+.al-doc:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--al-gold-glow);
+  border-radius: var(--al-radius-panel);
+}
+
+.al-doc__line {
+  display: block;
+  width: 100%;
+  max-width: 38ch;
+  margin: 0 auto;
+  font-family: var(--al-font-display);
+  line-height: var(--al-leading-lyric);
+  letter-spacing: 0.005em;
+  color: var(--al-ink-faint);
+  font-size: var(--al-lyric-far);
+  padding: var(--al-space-2) 0;
+  text-align: center;
+  cursor: pointer;
+  opacity: 0.5;
+  transition:
+    color var(--al-dur-focus) var(--al-ease-ink),
+    font-size var(--al-dur-focus) var(--al-ease-ink),
+    opacity var(--al-dur-focus) var(--al-ease-ink),
+    filter var(--al-dur-focus) var(--al-ease-ink);
+}
+/* depth-of-field tiers */
+.al-doc__line--mid {
+  color: var(--al-ink-faint);
+  font-size: var(--al-lyric-far);
+  opacity: 0.7;
+}
+.al-doc__line--near {
+  color: var(--al-ink-dim);
+  font-size: var(--al-lyric-near);
+  opacity: 0.92;
+}
+.al-doc__line--active {
+  color: var(--al-ink);
+  font-size: var(--al-lyric-active);
+  opacity: 1;
+  filter: none;
+}
+.al-doc__line:hover {
+  color: var(--al-ink-dim);
+  opacity: 1;
+}
+.al-doc__line--active:hover {
+  color: var(--al-ink);
+}
+
+/* flat-read mode: drop the rack-focus dimming for fast multi-line scanning */
+.al-doc--flat .al-doc__line {
+  color: var(--al-ink-dim);
+  font-size: var(--al-lyric-near);
+  opacity: 1;
+}
+.al-doc--flat .al-doc__line--active {
+  color: var(--al-ink);
+}
+
+/* ── Words ── */
+.al-word {
+  position: relative;
+  display: inline-block;
+  padding: 0 0.06em;
+  border-radius: var(--al-radius-chip);
+  color: inherit;
+  transition:
+    background var(--al-dur-snap) var(--al-ease-snap),
+    color var(--al-dur-snap) var(--al-ease-snap);
+  cursor: text;
+}
+.al-word:hover {
+  background: var(--al-surface-2);
+}
+.al-word--selected {
+  background: var(--al-gold-glow);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--al-gold) 40%, transparent);
+}
+/* the word the playhead is currently inside reads in full warm ink */
+.al-word--passing {
+  color: var(--al-ink);
+}
+/* already-sung words on the active line settle a touch quieter */
+.al-doc__line--active .al-word--sung {
+  color: var(--al-ink-dim);
+}
+
+/* gold word-sweep underline (bound to currentTime, linear) */
+.al-word__sweep {
+  position: absolute;
+  left: 0.06em;
+  right: 0.06em;
+  bottom: -0.06em;
+  height: 2px;
+  width: 0;
+  max-width: calc(100% - 0.12em);
+  background: var(--al-gold);
+  box-shadow: 0 0 8px var(--al-gold-glow);
+  border-radius: 2px;
+  pointer-events: none;
+}
+.al-word__sweep-edge {
+  position: absolute;
+  right: -1px;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--al-gold-soft);
+  box-shadow: 0 0 10px var(--al-gold);
+  transform: translateY(-50%);
+}
+
+/* low-confidence: quiet hollow amber outline (event-driven, never a fill) */
+.al-word--low {
+  outline: 1px solid color-mix(in srgb, var(--al-amber) 55%, transparent);
+  outline-offset: 1px;
+  border-radius: var(--al-radius-chip);
+  color: color-mix(in srgb, var(--al-amber) 80%, var(--al-ink));
+}
+/* a SINGLE pulse as the playhead passes a low-confidence word */
+.al-word--pulse {
+  animation: al-amber-pulse 0.62s var(--al-ease-snap) 1;
+}
+@keyframes al-amber-pulse {
+  0% {
+    background: var(--al-amber-glow);
+    outline-color: var(--al-amber);
+    box-shadow: 0 0 0 3px var(--al-amber-glow);
+  }
+  100% {
+    background: transparent;
+    outline-color: color-mix(in srgb, var(--al-amber) 55%, transparent);
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   WordInspector — summonable popover body
+   ══════════════════════════════════════════════════════════════════ */
+.al-inspector {
+  width: 324px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-3);
+}
+.al-inspector__row {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-2);
+}
+.al-inspector__row--between {
+  justify-content: space-between;
+}
+.al-inspector__title {
+  font-family: var(--al-font-mono);
+  font-size: var(--al-text-xs);
+  letter-spacing: var(--al-tracking-caps);
+  text-transform: uppercase;
+  color: var(--al-ink-muted);
+}
+.al-inspector__text input,
+.al-inspector__text .al-field__input {
+  font-family: var(--al-font-display);
+  font-size: var(--al-text-lg);
+}
+.al-inspector__wave {
+  height: 56px;
+  border-radius: var(--al-radius-ctrl);
+  overflow: visible;
+  position: relative;
+}
+.al-inspector__dur-label {
+  font-family: var(--al-font-mono);
+  font-size: var(--al-text-xs);
+  letter-spacing: var(--al-tracking-caps);
+  color: var(--al-ink-muted);
+}
+.al-inspector__hint {
+  font-family: var(--al-font-mono);
+  font-size: var(--al-text-xs);
+  line-height: 1.5;
+  color: var(--al-ink-faint);
+}
+.al-inspector__confirm {
+  width: 100%;
+  justify-content: center;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   WaveformStrip — bounded decimated peaks + playhead + boundary handles
+   ══════════════════════════════════════════════════════════════════ */
+.al-wavestrip {
+  position: relative;
+  width: 100%;
+  height: 64px;
+  background: var(--al-surface);
+  border-radius: var(--al-radius-panel);
+  border: 1px solid var(--al-hairline);
+  overflow: hidden;
+  touch-action: none;
+}
+.al-wavestrip--mini {
+  background: var(--al-surface-2);
+  overflow: visible;
+}
+.al-wavestrip__svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+}
+.al-wavestrip__peaks {
+  fill: var(--al-ink-faint);
+  opacity: 0.85;
+}
+.al-wavestrip--mini .al-wavestrip__peaks {
+  fill: var(--al-ink-muted);
+  opacity: 0.7;
+}
+.al-wavestrip__playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--al-gold);
+  box-shadow: 0 0 10px var(--al-gold-glow);
+  pointer-events: none;
+}
+/* onset-magnetize flash on the snapped boundary (gold, damped, one-shot) */
+.al-wavestrip__flash {
+  fill: var(--al-gold);
+  opacity: 0.5;
+  animation: al-onset-flash 0.22s var(--al-ease-snap) 1;
+}
+@keyframes al-onset-flash {
+  0% { opacity: 0.6; }
+  100% { opacity: 0; }
+}
+
+/* draggable word-boundary handles */
+.al-wavestrip__handle {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 14px;
+  margin-left: -7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: ew-resize;
+  z-index: 2;
+}
+.al-wavestrip__handle-grip {
+  width: 2px;
+  height: 100%;
+  background: var(--al-ink-dim);
+  border-radius: 2px;
+  transition:
+    background var(--al-dur-snap) var(--al-ease-snap),
+    box-shadow var(--al-dur-snap) var(--al-ease-snap);
+}
+.al-wavestrip__handle::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: var(--al-surface);
+  border: 1px solid var(--al-hairline-strong);
+  transition: border-color var(--al-dur-snap) var(--al-ease-snap);
+}
+.al-wavestrip__handle:hover .al-wavestrip__handle-grip,
+.al-wavestrip__handle:focus-visible .al-wavestrip__handle-grip {
+  background: var(--al-gold-soft);
+  box-shadow: 0 0 8px var(--al-gold-glow);
+}
+.al-wavestrip__handle.is-dragging .al-wavestrip__handle-grip {
+  background: var(--al-gold);
+  box-shadow: 0 0 10px var(--al-gold-glow);
+}
+.al-wavestrip__handle.is-dragging::before {
+  border-color: var(--al-gold);
+}
+.al-wavestrip__handle.is-snapped .al-wavestrip__handle-grip {
+  background: var(--al-gold-soft);
+  box-shadow: 0 0 14px var(--al-gold);
+}
+
+/* floating tape readout while dragging a boundary (10 ms steps) */
+.al-wavestrip__tape {
+  position: absolute;
+  top: -26px;
+  transform: translateX(-50%);
+  padding: 2px 6px;
+  border-radius: var(--al-radius-chip);
+  background: var(--al-surface-2);
+  border: 1px solid var(--al-hairline-strong);
+  box-shadow: var(--al-shadow-pop);
+  font-family: var(--al-font-mono);
+  font-size: var(--al-text-xs);
+  color: var(--al-gold-soft);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Transport — edge-docked play/pause, ±5 s, waveform, current/total
+   ══════════════════════════════════════════════════════════════════ */
+.al-transport {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-3);
+  padding: var(--al-space-3) var(--al-gutter);
+  border-top: 1px solid var(--al-hairline);
+  flex-shrink: 0;
+}
+.al-transport__wave {
+  flex: 1;
+  min-width: 0;
+}
+.al-transport__time {
+  font-family: var(--al-font-mono);
+  font-size: var(--al-text-sm);
+  color: var(--al-ink-dim);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.al-transport__time .sep {
+  color: var(--al-ink-faint);
+  margin: 0 4px;
+}
+
+/* ── Empty state ── */
+.al-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--al-space-3);
+  text-align: center;
+  color: var(--al-ink-muted);
+  padding: var(--al-gutter);
+}
+.al-empty__title {
+  font-family: var(--al-font-display);
+  font-size: var(--al-lyric-near);
+  color: var(--al-ink-dim);
+}
+
+/* ── Narrow window: tighten the page gutter so the column still breathes ── */
+@media (max-width: 900px) {
+  .al-editor__bar,
+  .al-transport {
+    padding-left: var(--al-space-5);
+    padding-right: var(--al-space-5);
+  }
+  .al-doc {
+    padding-left: var(--al-space-5);
+    padding-right: var(--al-space-5);
+  }
+  .al-editor__hint {
+    display: none;
+  }
+}
+
+/* ── Reduced motion: freeze the sweep + onset flash to discrete states ── */
+@media (prefers-reduced-motion: reduce) {
+  .al-word--pulse,
+  .al-wavestrip__flash {
+    animation: none;
+  }
+  .al-doc {
+    scroll-behavior: auto;
+  }
+}

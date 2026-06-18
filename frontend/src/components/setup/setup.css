@@ -1,0 +1,311 @@
+/* ──────────────────────────────────────────────────────────────────
+   setup.css — SetupScreen first-run wizard styles.
+
+   Follows the AutoLyrics design language (DESIGN.md):
+     • warm-graphite surfaces (#121013 / #1A171C / #221E25)
+     • antique-gold #E8C36B for primary action + accent
+     • hairline rules (rgba 244,241,234,0.07)
+     • Inter body / JetBrains Mono for log / small caps
+     • 8 px panels, 6 px controls, split-speed motion
+   ────────────────────────────────────────────────────────────────── */
+
+/* ── Full-screen overlay ─────────────────────────────────────────── */
+.al-setup-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--al-space-6);
+  background: var(--al-bg);
+  /* Soft warm vignette so it feels like a page, not a modal. */
+  background-image:
+    radial-gradient(ellipse 70% 60% at 50% 40%, rgba(232, 195, 107, 0.04) 0%, transparent 70%);
+  padding: var(--al-space-6) var(--al-gutter);
+  overflow-y: auto;
+}
+
+/* ── Header ──────────────────────────────────────────────────────── */
+.al-setup-screen__head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--al-space-2);
+  text-align: center;
+}
+
+.al-setup-screen__mark {
+  font-size: 32px;
+  color: var(--al-gold);
+  line-height: 1;
+  /* Subtle glow on the diamond mark */
+  text-shadow: 0 0 24px var(--al-gold-glow);
+}
+
+.al-setup-screen__title {
+  font-family: var(--al-font-display);
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--al-ink);
+  letter-spacing: 0.01em;
+  margin: 0;
+}
+
+.al-setup-screen__sub {
+  font-family: var(--al-font-body);
+  font-size: var(--al-text-md);
+  color: var(--al-ink-dim);
+  margin: 0;
+}
+
+/* ── Main card ───────────────────────────────────────────────────── */
+.al-setup-screen__card {
+  width: 100%;
+  max-width: 560px;
+  background: var(--al-surface);
+  border: 1px solid var(--al-hairline);
+  border-radius: var(--al-radius-panel);
+  box-shadow: var(--al-shadow-panel);
+  overflow: hidden;
+}
+
+/* ── Phase sections ──────────────────────────────────────────────── */
+.al-setup-phase {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-4);
+  padding: var(--al-space-6) var(--al-pad-panel);
+}
+
+/* Loading skeleton variant */
+.al-setup-phase--loading {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--al-space-3);
+  color: var(--al-ink-muted);
+  font-family: var(--al-font-body);
+  font-size: var(--al-text-md);
+}
+
+/* ── Phase icon ──────────────────────────────────────────────────── */
+.al-setup-phase__icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.al-setup-phase__icon--gold {
+  background: rgba(232, 195, 107, 0.12);
+  color: var(--al-gold);
+}
+
+.al-setup-phase__icon--warn {
+  background: rgba(224, 162, 78, 0.12);
+  color: var(--al-amber);
+}
+
+.al-setup-phase__icon--error {
+  background: rgba(224, 106, 90, 0.12);
+  color: var(--al-error);
+}
+
+.al-setup-phase__icon--green {
+  background: rgba(91, 212, 155, 0.12);
+  color: var(--al-green);
+}
+
+/* ── Phase heading ───────────────────────────────────────────────── */
+.al-setup-phase__heading {
+  font-family: var(--al-font-display);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--al-ink);
+  margin: 0;
+  line-height: 1.3;
+}
+
+.al-setup-phase__heading--error {
+  color: var(--al-error);
+}
+
+.al-setup-phase__heading--green {
+  color: var(--al-green);
+}
+
+/* ── Body copy ───────────────────────────────────────────────────── */
+.al-setup-phase__body {
+  font-family: var(--al-font-body);
+  font-size: var(--al-text-md);
+  color: var(--al-ink-dim);
+  line-height: 1.65;
+  margin: 0;
+}
+
+.al-setup-phase__en {
+  color: var(--al-ink-muted);
+  font-size: var(--al-text-sm);
+}
+
+/* ── Meta rows (python version, dir path) ────────────────────────── */
+.al-setup-phase__meta {
+  display: flex;
+  align-items: baseline;
+  gap: var(--al-space-3);
+  font-family: var(--al-font-mono);
+  font-size: var(--al-text-sm);
+  color: var(--al-ink-dim);
+  margin: 0;
+}
+
+.al-setup-phase__meta-label {
+  font-size: var(--al-text-xs);
+  letter-spacing: var(--al-tracking-caps);
+  text-transform: uppercase;
+  color: var(--al-ink-faint);
+  flex-shrink: 0;
+  width: 52px;
+}
+
+.al-setup-phase__meta-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--al-ink-muted);
+}
+
+/* ── Action row ──────────────────────────────────────────────────── */
+.al-setup-phase__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-3);
+  margin-top: var(--al-space-2);
+}
+
+/* ── Python.org link ─────────────────────────────────────────────── */
+.al-setup-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--al-space-2);
+  font-family: var(--al-font-mono);
+  font-size: var(--al-text-sm);
+  color: var(--al-gold);
+  text-decoration: none;
+  transition: color var(--al-dur-snap) var(--al-ease-snap);
+}
+
+.al-setup-link:hover {
+  color: var(--al-gold-soft);
+}
+
+.al-setup-link:focus-visible {
+  outline: 1px solid var(--al-gold);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* ── Running phase header ────────────────────────────────────────── */
+.al-setup-phase__running-head {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-3);
+  color: var(--al-ink-dim);
+  font-family: var(--al-font-body);
+  font-size: var(--al-text-md);
+}
+
+.al-setup-phase__running-label {
+  flex: 1;
+}
+
+.al-setup-phase__running-pct {
+  font-family: var(--al-font-mono);
+  font-size: var(--al-text-sm);
+  color: var(--al-gold);
+  letter-spacing: 0.04em;
+  min-width: 38px;
+  text-align: right;
+}
+
+/* ── Reassuring note during install ────────────────────────────────── */
+.al-setup-phase__note {
+  font-family: var(--al-font-body);
+  font-size: var(--al-text-sm);
+  color: var(--al-ink-muted);
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* ── Live log ────────────────────────────────────────────────────── */
+.al-setup-log {
+  background: var(--al-surface-2);
+  border: 1px solid var(--al-hairline);
+  border-radius: var(--al-radius-ctrl);
+  padding: var(--al-space-3) var(--al-pad-panel);
+  max-height: 220px;
+  overflow-y: auto;
+  /* Custom scrollbar — thin + warm */
+  scrollbar-width: thin;
+  scrollbar-color: var(--al-hairline-strong) transparent;
+}
+
+.al-setup-log::-webkit-scrollbar {
+  width: 4px;
+}
+.al-setup-log::-webkit-scrollbar-track {
+  background: transparent;
+}
+.al-setup-log::-webkit-scrollbar-thumb {
+  background: var(--al-hairline-strong);
+  border-radius: 2px;
+}
+
+.al-setup-log--error {
+  border-color: rgba(224, 106, 90, 0.20);
+}
+
+.al-setup-log__line {
+  font-family: var(--al-font-mono);
+  font-size: var(--al-text-xs);
+  line-height: 1.7;
+  color: var(--al-ink-dim);
+  /* Allow long paths to wrap neatly */
+  word-break: break-all;
+}
+
+/* Stderr lines (prefixed "[stderr]") get a muted amber tint */
+.al-setup-log__line:has-text("[stderr]") {
+  color: var(--al-amber);
+}
+
+/* ── Footer ──────────────────────────────────────────────────────── */
+.al-setup-screen__foot {
+  font-family: var(--al-font-mono);
+  font-size: var(--al-text-xs);
+  letter-spacing: var(--al-tracking-caps);
+  text-transform: uppercase;
+  color: var(--al-ink-faint);
+  text-align: center;
+}
+
+/* ── Spinner animation (shared with SetupBanner) ─────────────────── */
+/* Already defined globally as .al-spin; guard in case it isn't. */
+@keyframes al-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.al-spin {
+  animation: al-spin 1s linear infinite;
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .al-spin {
+    animation: none;
+  }
+}

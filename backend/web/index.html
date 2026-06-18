@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AutoLyrics · 後端測試台</title>
+<style>
+  :root {
+    --bg: #0c0e14;
+    --panel: #14171f;
+    --panel-2: #1b1f2a;
+    --line: #262b38;
+    --line-2: #313847;
+    --txt: #e6e9f0;
+    --txt-dim: #98a0b3;
+    --txt-faint: #5e6678;
+    --accent: #6ea8fe;
+    --accent-2: #8b7cff;
+    --good: #4ade80;
+    --warn: #fbbf24;
+    --bad: #f87171;
+    --radius: 10px;
+    --mono: ui-monospace, "SFMono-Regular", "Menlo", "Consolas", monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--txt);
+    font-family: system-ui, -apple-system, "Segoe UI", "Noto Sans TC", sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  a { color: var(--accent); }
+  header {
+    display: flex; align-items: baseline; gap: 12px;
+    padding: 16px 22px;
+    border-bottom: 1px solid var(--line);
+    position: sticky; top: 0; background: rgba(12,14,20,.92);
+    backdrop-filter: blur(8px); z-index: 5;
+  }
+  header h1 { font-size: 17px; margin: 0; font-weight: 650; letter-spacing: .3px; }
+  header .sub { color: var(--txt-faint); font-size: 12px; }
+  header .caps { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+  .cap {
+    font-size: 11px; font-family: var(--mono);
+    padding: 3px 9px; border-radius: 999px;
+    border: 1px solid var(--line-2); color: var(--txt-dim);
+  }
+  .cap.on { color: var(--good); border-color: #2a4a36; background: #16241b; }
+  .cap.off { color: var(--txt-faint); }
+  main {
+    display: grid; grid-template-columns: 380px 1fr; gap: 18px;
+    padding: 18px 22px; align-items: start;
+  }
+  @media (max-width: 920px) { main { grid-template-columns: 1fr; } }
+  .panel {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 16px;
+  }
+  .panel h2 {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--txt-faint); margin: 0 0 14px; font-weight: 600;
+  }
+  .field { margin-bottom: 14px; }
+  .field > label {
+    display: block; font-size: 12px; color: var(--txt-dim);
+    margin-bottom: 5px; font-weight: 500;
+  }
+  input[type=text], textarea, select {
+    width: 100%; background: var(--panel-2); color: var(--txt);
+    border: 1px solid var(--line-2); border-radius: 8px;
+    padding: 8px 10px; font-size: 13px; font-family: inherit;
+    outline: none; transition: border-color .15s;
+  }
+  input[type=text]:focus, textarea:focus, select:focus { border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 72px; font-family: var(--mono); font-size: 12px; }
+  select { appearance: none; cursor: pointer; }
+  .row { display: flex; gap: 10px; }
+  .row > .field { flex: 1; margin-bottom: 0; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  /* dropzone */
+  .drop {
+    border: 1.5px dashed var(--line-2); border-radius: 10px;
+    padding: 18px; text-align: center; cursor: pointer;
+    transition: border-color .15s, background .15s; color: var(--txt-dim);
+  }
+  .drop:hover, .drop.hover { border-color: var(--accent); background: #161b27; color: var(--txt); }
+  .drop .big { font-size: 13px; color: var(--txt); }
+  .drop .file { margin-top: 6px; font-family: var(--mono); font-size: 12px; color: var(--accent); word-break: break-all; }
+
+  /* mode segmented */
+  .seg { display: flex; border: 1px solid var(--line-2); border-radius: 8px; overflow: hidden; }
+  .seg button {
+    flex: 1; background: transparent; color: var(--txt-dim); border: 0;
+    padding: 8px 4px; cursor: pointer; font-size: 12px; font-family: inherit;
+    border-right: 1px solid var(--line-2); transition: background .15s, color .15s;
+  }
+  .seg button:last-child { border-right: 0; }
+  .seg button.active { background: var(--accent); color: #08111f; font-weight: 600; }
+
+  /* chips */
+  .chips { display: flex; flex-wrap: wrap; gap: 7px; }
+  .chip {
+    font-size: 12px; padding: 5px 11px; border-radius: 999px;
+    border: 1px solid var(--line-2); color: var(--txt-dim);
+    cursor: pointer; user-select: none; transition: all .12s;
+  }
+  .chip:hover { border-color: var(--accent); color: var(--txt); }
+  .chip.on { background: var(--accent-2); border-color: var(--accent-2); color: #0a0816; font-weight: 600; }
+
+  /* toggle */
+  .toggle { display: flex; align-items: center; gap: 9px; cursor: pointer; user-select: none; }
+  .toggle input { display: none; }
+  .toggle .track {
+    width: 38px; height: 21px; border-radius: 999px; background: var(--line-2);
+    position: relative; transition: background .15s; flex: none;
+  }
+  .toggle .track::after {
+    content: ""; position: absolute; top: 2px; left: 2px;
+    width: 17px; height: 17px; border-radius: 50%; background: #fff;
+    transition: transform .15s;
+  }
+  .toggle input:checked + .track { background: var(--good); }
+  .toggle input:checked + .track::after { transform: translateX(17px); }
+  .toggle.disabled { opacity: .45; cursor: not-allowed; }
+  .toggle small { color: var(--txt-faint); }
+
+  /* buttons */
+  .btn {
+    background: var(--accent); color: #08111f; border: 0; border-radius: 9px;
+    padding: 11px 16px; font-size: 14px; font-weight: 650; cursor: pointer;
+    width: 100%; transition: filter .15s; font-family: inherit;
+  }
+  .btn:hover { filter: brightness(1.08); }
+  .btn:disabled { opacity: .5; cursor: not-allowed; filter: none; }
+  .btn.ghost {
+    background: transparent; border: 1px solid var(--line-2); color: var(--txt);
+    width: auto; padding: 7px 13px; font-size: 12px; font-weight: 500;
+  }
+  .btn.ghost:hover { border-color: var(--accent); }
+
+  /* progress */
+  .status { margin-top: 14px; }
+  .pbar { height: 7px; background: var(--panel-2); border-radius: 999px; overflow: hidden; }
+  .pbar > i { display: block; height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width .25s; }
+  .pmeta { display: flex; justify-content: space-between; font-size: 12px; color: var(--txt-dim); margin-top: 6px; }
+  .pmeta .stage { font-family: var(--mono); }
+  .badge { font-family: var(--mono); font-size: 11px; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--line-2); }
+  .badge.queued { color: var(--txt-dim); }
+  .badge.running { color: var(--accent); border-color: #2c3e5c; }
+  .badge.done { color: var(--good); border-color: #2a4a36; }
+  .badge.error { color: var(--bad); border-color: #4a2a2a; }
+
+  /* result editor */
+  .res-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .res-head .meta { font-family: var(--mono); font-size: 11px; color: var(--txt-faint); }
+  .exports { display: flex; gap: 7px; flex-wrap: wrap; margin-left: auto; }
+  .seglist { display: flex; flex-direction: column; gap: 8px; max-height: 60vh; overflow-y: auto; padding-right: 4px; }
+  .seg-card {
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: 9px; padding: 10px 11px;
+  }
+  .seg-top { display: flex; gap: 8px; align-items: center; margin-bottom: 7px; }
+  .seg-top .idx { font-family: var(--mono); font-size: 11px; color: var(--txt-faint); min-width: 26px; }
+  .seg-top input.time {
+    width: 78px; font-family: var(--mono); font-size: 12px; text-align: center;
+    padding: 4px 6px; background: var(--bg);
+  }
+  .seg-top .arrow { color: var(--txt-faint); font-size: 12px; }
+  .seg-card textarea.text {
+    min-height: 0; height: 34px; font-family: inherit; font-size: 13px; background: var(--bg); resize: vertical;
+  }
+  .words { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 7px; }
+  .word {
+    font-size: 11px; font-family: var(--mono); padding: 2px 6px; border-radius: 5px;
+    background: var(--bg); border: 1px solid var(--line); color: var(--txt-dim);
+  }
+  .word.low { border-color: var(--warn); color: var(--warn); background: #221d10; }
+  .word .t { color: var(--txt-faint); font-size: 10px; margin-left: 4px; }
+
+  .empty { color: var(--txt-faint); text-align: center; padding: 50px 20px; font-size: 13px; }
+  .err-box { background: #241616; border: 1px solid #4a2a2a; color: var(--bad); border-radius: 9px; padding: 12px; font-size: 13px; white-space: pre-wrap; }
+  .hint { font-size: 11px; color: var(--txt-faint); margin-top: 4px; }
+  audio { width: 100%; margin-top: 10px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>AutoLyrics</h1>
+  <span class="sub">後端測試台 · backend test harness</span>
+  <div class="caps" id="caps"></div>
+</header>
+
+<main>
+  <!-- ════════════ 左欄:輸入 ════════════ -->
+  <section class="panel" id="form">
+    <h2>輸入 Input</h2>
+
+    <div class="field">
+      <label>音檔 Audio</label>
+      <div class="drop" id="drop">
+        <div class="big">拖放音檔到此,或點擊選擇</div>
+        <div class="hint">mp3 / wav / flac / m4a</div>
+        <div class="file" id="fileName"></div>
+      </div>
+      <input type="file" id="fileInput" accept="audio/*" style="display:none" />
+      <audio id="preview" controls style="display:none"></audio>
+    </div>
+
+    <div class="field">
+      <label>模式 Mode</label>
+      <div class="seg" id="modeSeg">
+        <button data-mode="auto" class="active">自動 Auto</button>
+        <button data-mode="biasing">偏置 Biasing</button>
+        <button data-mode="align">對齊 Align</button>
+      </div>
+      <div class="hint" id="modeHint">純辨識:不給任何提示,直接轉錄。</div>
+    </div>
+
+    <div class="field" id="lyricsField">
+      <label>參考歌詞 Reference Lyrics <span style="color:var(--txt-faint)">(align 必填 · 換行有意義)</span></label>
+      <textarea id="referenceLyrics" placeholder="貼上完整歌詞(align),或部分歌詞作為偏置提示…"></textarea>
+    </div>
+
+    <div class="field" id="contentField">
+      <label>內容提示 Reference Content</label>
+      <input type="text" id="referenceContent" placeholder="例如:歌名、歌手、主題、難字…" />
+    </div>
+
+    <div class="field" id="styleField">
+      <label>曲風 Style</label>
+      <div class="chips" id="styleChips"></div>
+    </div>
+
+    <div class="grid2">
+      <div class="field">
+        <label>語言 Language</label>
+        <select id="language"></select>
+      </div>
+      <div class="field">
+        <label>模型 Model</label>
+        <select id="modelSize"></select>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="field">
+        <label>裝置 Device</label>
+        <select id="device">
+          <option value="auto">自動 Auto</option>
+          <option value="cuda">CUDA (GPU)</option>
+          <option value="cpu">CPU</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>人聲分離 Separate</label>
+        <label class="toggle" id="separateToggle">
+          <input type="checkbox" id="separate" checked />
+          <span class="track"></span>
+          <small id="separateNote">Demucs</small>
+        </label>
+      </div>
+    </div>
+
+    <button class="btn" id="submitBtn">開始辨識 Run</button>
+
+    <div class="status" id="status" style="display:none">
+      <div class="pbar"><i id="pbarFill"></i></div>
+      <div class="pmeta">
+        <span><span class="badge queued" id="statusBadge">queued</span> <span class="stage" id="stageText"></span></span>
+        <span id="pctText">0%</span>
+      </div>
+      <div class="pmeta"><span id="msgText" style="color:var(--txt-faint)"></span></div>
+    </div>
+  </section>
+
+  <!-- ════════════ 右欄:結果 ════════════ -->
+  <section class="panel" id="resultPanel">
+    <div class="res-head">
+      <h2 style="margin:0">結果 Result</h2>
+      <span class="meta" id="resultMeta"></span>
+      <div class="exports" id="exports" style="display:none">
+        <select id="exportLevel" style="width:auto;padding:6px 8px;font-size:12px">
+          <option value="line">line</option>
+          <option value="word">word</option>
+        </select>
+        <button class="btn ghost" data-fmt="lrc">.lrc</button>
+        <button class="btn ghost" data-fmt="srt">.srt</button>
+        <button class="btn ghost" data-fmt="ass">.ass</button>
+        <button class="btn ghost" data-fmt="json">.json</button>
+      </div>
+    </div>
+    <div id="resultBody">
+      <div class="empty">尚無結果。選擇音檔並按「開始辨識」。</div>
+    </div>
+  </section>
+</main>
+
+<script>
+"use strict";
+const API = ""; // 同源;伺服器把本頁掛在 "/"
+
+const $ = (id) => document.getElementById(id);
+const state = {
+  file: null,
+  mode: "auto",
+  styleKeys: new Set(),
+  meta: null,
+  jobId: null,
+  poll: null,
+  result: null,   // 可被編輯的結果
+};
+
+// ───────── 工具 ─────────
+function fmtTime(sec) {
+  sec = Math.max(0, Number(sec) || 0);
+  const m = Math.floor(sec / 60);
+  const s = (sec - m * 60);
+  return String(m).padStart(2, "0") + ":" + s.toFixed(2).padStart(5, "0");
+}
+function parseTime(str) {
+  // 接受 "mm:ss.xx" 或純秒數
+  str = String(str).trim();
+  if (str.includes(":")) {
+    const [m, s] = str.split(":");
+    return (parseInt(m, 10) || 0) * 60 + (parseFloat(s) || 0);
+  }
+  return parseFloat(str) || 0;
+}
+
+// ───────── 載入 /api/meta ─────────
+async function loadMeta() {
+  try {
+    const r = await fetch(API + "/api/meta");
+    const meta = await r.json();
+    state.meta = meta;
+    renderCaps(meta);
+    renderStyles(meta.styles || []);
+    renderLanguages(meta.languages || []);
+    renderModels(meta.modelSizes || []);
+    applyGating(meta);
+  } catch (e) {
+    $("caps").innerHTML = '<span class="cap off">無法連線後端</span>';
+    console.error("loadMeta failed", e);
+  }
+}
+function renderCaps(m) {
+  const cap = (label, on) =>
+    `<span class="cap ${on ? "on" : "off"}">${label} ${on ? "✓" : "✕"}</span>`;
+  $("caps").innerHTML =
+    cap("GPU", m.gpu) +
+    cap("Demucs", m.demucs) +
+    cap("Aligner", m.aligner) +
+    `<span class="cap">v${m.version || "?"}</span>`;
+}
+function renderStyles(styles) {
+  const box = $("styleChips");
+  box.innerHTML = "";
+  styles.forEach((s) => {
+    const el = document.createElement("span");
+    el.className = "chip";
+    el.textContent = s.label || s.key;
+    el.dataset.key = s.key;
+    el.onclick = () => {
+      if (state.styleKeys.has(s.key)) { state.styleKeys.delete(s.key); el.classList.remove("on"); }
+      else { state.styleKeys.add(s.key); el.classList.add("on"); }
+    };
+    box.appendChild(el);
+  });
+}
+function renderLanguages(langs) {
+  const sel = $("language");
+  sel.innerHTML = "";
+  langs.forEach((l, i) => {
+    const o = document.createElement("option");
+    // code 可能為 null(自動);用特殊值 "__auto__" 標記
+    o.value = l.code == null ? "__auto__" : l.code;
+    o.textContent = l.label + (l.iso3 ? ` (${l.iso3})` : "");
+    sel.appendChild(o);
+  });
+}
+function renderModels(sizes) {
+  const sel = $("modelSize");
+  sel.innerHTML = "";
+  sizes.forEach((s) => {
+    const o = document.createElement("option");
+    o.value = s; o.textContent = s;
+    sel.appendChild(o);
+  });
+}
+function applyGating(m) {
+  // 依能力閘門 UI
+  const sepTog = $("separateToggle");
+  if (!m.demucs) {
+    $("separate").checked = false;
+    $("separate").disabled = true;
+    sepTog.classList.add("disabled");
+    $("separateNote").textContent = "Demucs 不可用";
+  }
+  const alignBtn = document.querySelector('#modeSeg button[data-mode="align"]');
+  if (!m.aligner && alignBtn) {
+    alignBtn.disabled = true;
+    alignBtn.title = "強制對齊器不可用";
+    alignBtn.style.opacity = ".45";
+    alignBtn.style.cursor = "not-allowed";
+  }
+  if (!m.gpu) {
+    const cudaOpt = document.querySelector('#device option[value="cuda"]');
+    if (cudaOpt) cudaOpt.textContent = "CUDA (無 GPU)";
+  }
+}
+
+// ───────── 檔案選擇 / 拖放 ─────────
+const drop = $("drop");
+drop.onclick = () => $("fileInput").click();
+$("fileInput").onchange = (e) => setFile(e.target.files[0]);
+["dragenter", "dragover"].forEach((ev) =>
+  drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("hover"); }));
+["dragleave", "drop"].forEach((ev) =>
+  drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("hover"); }));
+drop.addEventListener("drop", (e) => {
+  if (e.dataTransfer.files && e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
+});
+function setFile(f) {
+  if (!f) return;
+  state.file = f;
+  $("fileName").textContent = f.name + "  ·  " + (f.size / 1048576).toFixed(2) + " MB";
+  const pv = $("preview");
+  pv.src = URL.createObjectURL(f);
+  pv.style.display = "block";
+}
+
+// ───────── 模式切換 ─────────
+const modeHints = {
+  auto: "純辨識:不給任何提示,直接轉錄。",
+  biasing: "偏置辨識:把內容提示 + 曲風 + 部分歌詞餵給辨識器。",
+  align: "強制對齊:用完整歌詞做近乎完美的逐字對齊。",
+};
+$("modeSeg").querySelectorAll("button").forEach((b) => {
+  b.onclick = () => {
+    if (b.disabled) return;
+    state.mode = b.dataset.mode;
+    $("modeSeg").querySelectorAll("button").forEach((x) => x.classList.remove("active"));
+    b.classList.add("active");
+    $("modeHint").textContent = modeHints[state.mode] || "";
+  };
+});
+
+// ───────── 送出工作 ─────────
+$("submitBtn").onclick = submitJob;
+async function submitJob() {
+  if (!state.file) { alert("請先選擇音檔。"); return; }
+
+  const langVal = $("language").value;
+  const params = {
+    mode: state.mode,
+    referenceLyrics: $("referenceLyrics").value,
+    referenceContent: $("referenceContent").value,
+    styleKeys: Array.from(state.styleKeys),
+    language: langVal === "__auto__" ? null : langVal,
+    modelSize: $("modelSize").value,
+    separate: $("separate").checked,
+    device: $("device").value,
+    engine: "whisper",
+  };
+
+  const fd = new FormData();
+  fd.append("audio", state.file);
+  fd.append("params", JSON.stringify(params));
+
+  setSubmitting(true);
+  showStatus("queued", "queued", 0, "送出中…");
+  $("resultBody").innerHTML = '<div class="empty">辨識中…</div>';
+  $("exports").style.display = "none";
+  $("resultMeta").textContent = "";
+
+  try {
+    const r = await fetch(API + "/api/jobs", { method: "POST", body: fd });
+    if (!r.ok) {
+      const txt = await r.text();
+      throw new Error("HTTP " + r.status + " · " + txt);
+    }
+    const { jobId } = await r.json();
+    state.jobId = jobId;
+    startPolling(jobId);
+  } catch (e) {
+    setSubmitting(false);
+    showStatus("error", "error", 0, "");
+    $("resultBody").innerHTML = `<div class="err-box">送出失敗:${escapeHtml(e.message)}</div>`;
+    console.error(e);
+  }
+}
+
+function setSubmitting(on) {
+  $("submitBtn").disabled = on;
+  $("submitBtn").textContent = on ? "處理中…" : "開始辨識 Run";
+}
+
+// ───────── 輪詢狀態 ─────────
+function startPolling(jobId) {
+  clearInterval(state.poll);
+  state.poll = setInterval(() => pollOnce(jobId), 700);
+  pollOnce(jobId);
+}
+async function pollOnce(jobId) {
+  try {
+    const r = await fetch(API + "/api/jobs/" + jobId);
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const j = await r.json();
+    showStatus(j.status, j.stage, j.pct, j.message);
+
+    if (j.status === "done") {
+      clearInterval(state.poll);
+      setSubmitting(false);
+      state.result = j.result;
+      renderResult(j.result);
+    } else if (j.status === "error") {
+      clearInterval(state.poll);
+      setSubmitting(false);
+      $("resultBody").innerHTML =
+        `<div class="err-box">辨識失敗:${escapeHtml(j.error || j.message || "未知錯誤")}</div>`;
+    }
+  } catch (e) {
+    clearInterval(state.poll);
+    setSubmitting(false);
+    showStatus("error", "error", 0, "輪詢失敗:" + e.message);
+    console.error(e);
+  }
+}
+
+function showStatus(status, stage, pct, msg) {
+  $("status").style.display = "block";
+  const badge = $("statusBadge");
+  badge.className = "badge " + (status || "queued");
+  badge.textContent = status || "queued";
+  $("stageText").textContent = stage || "";
+  const p = Math.max(0, Math.min(100, Number(pct) || 0));
+  $("pbarFill").style.width = p + "%";
+  $("pctText").textContent = Math.round(p) + "%";
+  $("msgText").textContent = msg || "";
+}
+
+// ───────── 渲染可編輯結果 ─────────
+function renderResult(result) {
+  if (!result || !Array.isArray(result.segments)) {
+    $("resultBody").innerHTML = '<div class="empty">沒有可用的結果。</div>';
+    return;
+  }
+  const m = result.meta || {};
+  $("resultMeta").textContent =
+    `${result.language || "?"} · ${result.modeUsed || "?"} · ${m.modelSize || "?"} · ` +
+    `${m.engine || "?"} · ${m.separated ? "分離" : "原音"} · ${(m.durationSec || 0).toFixed(1)}s · ` +
+    `${result.segments.length} 段`;
+  $("exports").style.display = "flex";
+
+  if (result.segments.length === 0) {
+    $("resultBody").innerHTML = '<div class="empty">辨識完成,但沒有任何段落(可能是純音樂或無人聲)。</div>';
+    return;
+  }
+
+  const list = document.createElement("div");
+  list.className = "seglist";
+
+  result.segments.forEach((seg, i) => {
+    const card = document.createElement("div");
+    card.className = "seg-card";
+
+    const top = document.createElement("div");
+    top.className = "seg-top";
+
+    const idx = document.createElement("span");
+    idx.className = "idx";
+    idx.textContent = "#" + (seg.id != null ? seg.id : i);
+
+    const startIn = document.createElement("input");
+    startIn.className = "time"; startIn.type = "text";
+    startIn.value = fmtTime(seg.start);
+    startIn.onchange = () => { seg.start = parseTime(startIn.value); startIn.value = fmtTime(seg.start); };
+
+    const arrow = document.createElement("span");
+    arrow.className = "arrow"; arrow.textContent = "→";
+
+    const endIn = document.createElement("input");
+    endIn.className = "time"; endIn.type = "text";
+    endIn.value = fmtTime(seg.end);
+    endIn.onchange = () => { seg.end = parseTime(endIn.value); endIn.value = fmtTime(seg.end); };
+
+    top.append(idx, startIn, arrow, endIn);
+
+    const txt = document.createElement("textarea");
+    txt.className = "text";
+    txt.value = seg.text || "";
+    txt.oninput = () => { seg.text = txt.value; };
+
+    card.append(top, txt);
+
+    // 逐字 chips(含低信心標記)
+    if (Array.isArray(seg.words) && seg.words.length) {
+      const wbox = document.createElement("div");
+      wbox.className = "words";
+      seg.words.forEach((w) => {
+        const wc = document.createElement("span");
+        const prob = Number(w.prob);
+        wc.className = "word" + (prob < 0.5 ? " low" : "");
+        wc.title = `start ${fmtTime(w.start)} · end ${fmtTime(w.end)} · prob ${isNaN(prob) ? "?" : prob.toFixed(2)}`;
+        wc.innerHTML = `${escapeHtml(w.word || "")}<span class="t">${isNaN(prob) ? "" : prob.toFixed(2)}</span>`;
+        wbox.appendChild(wc);
+      });
+      card.appendChild(wbox);
+    }
+
+    list.appendChild(card);
+  });
+
+  $("resultBody").innerHTML = "";
+  $("resultBody").appendChild(list);
+}
+
+// ───────── 匯出(用可能已編輯的結果 → POST /api/export)─────────
+$("exports").querySelectorAll("button[data-fmt]").forEach((b) => {
+  b.onclick = () => exportResult(b.dataset.fmt);
+});
+async function exportResult(fmt) {
+  if (!state.result) return;
+  const level = $("exportLevel").value;
+  try {
+    const r = await fetch(API + "/api/export", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ result: state.result, fmt, level }),
+    });
+    if (!r.ok) {
+      const txt = await r.text();
+      throw new Error("HTTP " + r.status + " · " + txt);
+    }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "autolyrics." + fmt;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    alert("匯出失敗:" + e.message);
+    console.error(e);
+  }
+}
+
+function escapeHtml(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+// ───────── 啟動 ─────────
+loadMeta();
+</script>
+</body>
+</html>

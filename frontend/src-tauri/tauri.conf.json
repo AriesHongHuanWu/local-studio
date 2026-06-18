@@ -1,0 +1,58 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "AutoLyrics",
+  "version": "0.1.0",
+  "identifier": "com.autolyrics.desktop",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5174",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "AutoLyrics",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 1000,
+        "minHeight": 680,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true,
+        "decorations": false,
+        "backgroundColor": "#121013"
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis", "msi"],
+    "resources": {
+      "../../backend/app.py": "backend/app.py",
+      "../../backend/requirements.txt": "backend/requirements.txt",
+      "../../backend/install.ps1": "backend/install.ps1",
+      "../../backend/install.sh": "backend/install.sh",
+      "../../backend/run.ps1": "backend/run.ps1",
+      "../../backend/run.sh": "backend/run.sh",
+      "../../backend/test_e2e.py": "backend/test_e2e.py",
+      "../../backend/pipeline/**/*": "backend/pipeline/",
+      "../../backend/web/*": "backend/web/"
+    },
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "android": {
+      "debugApplicationIdSuffix": ".debug"
+    }
+  }
+}

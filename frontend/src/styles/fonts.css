@@ -1,0 +1,35 @@
+/* ──────────────────────────────────────────────────────────────────
+   Locally-bundled fonts — no web-font fetch, so the offline / local-first
+   promise holds.
+
+   Latin + mono (Source Serif 4 / Inter / JetBrains Mono) are bundled here
+   through the build via @fontsource.
+
+   CJK serif + sans (Noto Serif/Sans TC·JP·KR) ARE ALSO bundled locally,
+   but served verbatim from `public/fonts/cjk.css` via a <link> in
+   index.html — NOT through this file. Reason: each @fontsource CJK weight
+   ships ~110 unicode-range woff2 subsets (~1400 files total), and routing
+   that many assets through the bundler's emit graph crashes the Windows
+   build. Serving them from /public keeps them offline-bundled while
+   sidestepping that. The lyric document hero therefore renders 中文國語 /
+   粵語 / 日本語 / 한국어 in real Noto Serif CJK — never a broken system face.
+   See public/fonts/cjk.css and the --al-font-* stacks in tokens.css.
+   ────────────────────────────────────────────────────────────────── */
+
+/* Source Serif 4 — the document hero (Latin). */
+@import "@fontsource/source-serif-4/300.css";
+@import "@fontsource/source-serif-4/400.css";
+@import "@fontsource/source-serif-4/400-italic.css";
+@import "@fontsource/source-serif-4/500.css";
+@import "@fontsource/source-serif-4/600.css";
+@import "@fontsource/source-serif-4/700.css";
+
+/* Inter — quiet grotesk for chrome. */
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+
+/* JetBrains Mono — tape-counter digits / timecodes. */
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";

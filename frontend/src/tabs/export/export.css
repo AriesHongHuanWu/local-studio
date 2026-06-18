@@ -1,0 +1,344 @@
+/* ──────────────────────────────────────────────────────────────────
+   Export tab — format selection + per-format options + live monospace
+   preview (with an animated ASS \k karaoke sweep) + copy/save actions.
+   Tokens only; one accent (gold = live/primary), amber = event warn,
+   green = done. "Ink on dark stock."
+   ────────────────────────────────────────────────────────────────── */
+
+.al-export {
+  display: grid;
+  grid-template-columns: var(--al-rail-w) 1fr;
+  gap: var(--al-space-6);
+  max-width: 1180px;
+  margin: 0 auto;
+}
+.al-export__side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-6);
+}
+.al-export__group {
+  margin-top: var(--al-space-3);
+}
+.al-export__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-4);
+  min-width: 0;
+}
+
+/* ── Format links — a typeset vertical list ──────────────────────── */
+
+.al-formatlinks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-1);
+}
+.al-formatlink {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-3);
+  padding: 9px var(--al-space-3) 9px var(--al-space-4);
+  border-radius: var(--al-radius-ctrl);
+  color: var(--al-ink-dim);
+  background: transparent;
+  border: 1px solid transparent;
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
+  transition:
+    background var(--al-dur-snap) var(--al-ease-snap),
+    color var(--al-dur-snap) var(--al-ease-snap),
+    border-color var(--al-dur-snap) var(--al-ease-snap);
+}
+.al-formatlink:hover:not(.al-formatlink--active) {
+  background: var(--al-surface);
+  color: var(--al-ink);
+}
+.al-formatlink--active {
+  background: var(--al-surface-2);
+  color: var(--al-ink);
+  border-color: var(--al-hairline-strong);
+}
+/* gold left edge marks the live selection (accent discipline). */
+.al-formatlink__edge {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%) scaleY(0);
+  width: 2px;
+  height: 62%;
+  border-radius: 2px;
+  background: var(--al-gold);
+  box-shadow: 0 0 10px var(--al-gold-glow);
+  transition: transform var(--al-dur-focus) var(--al-ease-ink);
+}
+.al-formatlink--active .al-formatlink__edge {
+  transform: translateY(-50%) scaleY(1);
+}
+.al-formatlink__glyph {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: var(--al-radius-chip);
+  color: var(--al-ink-muted);
+  background: var(--al-surface-2);
+  border: 1px solid var(--al-hairline);
+  transition: color var(--al-dur-snap) var(--al-ease-snap);
+}
+.al-formatlink--active .al-formatlink__glyph {
+  color: var(--al-gold);
+  border-color: color-mix(in srgb, var(--al-gold) 28%, transparent);
+}
+.al-formatlink__body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.al-formatlink__name {
+  font-family: var(--al-font-display);
+  font-size: var(--al-text-lg);
+  line-height: 1.15;
+  display: flex;
+  align-items: baseline;
+  gap: var(--al-space-2);
+}
+.al-formatlink__ext {
+  font-family: var(--al-font-mono);
+  font-size: var(--al-text-xs);
+  color: var(--al-ink-faint);
+}
+.al-formatlink__blurb {
+  font-family: var(--al-font-mono);
+  font-size: var(--al-text-xs);
+  color: var(--al-ink-muted);
+  letter-spacing: 0.01em;
+}
+
+/* ── Options ─────────────────────────────────────────────────────── */
+
+.al-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-4);
+}
+.al-optrow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-2);
+}
+.al-optrow__label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--al-space-2);
+  font-family: var(--al-font-body);
+  font-size: var(--al-text-sm);
+  color: var(--al-ink-dim);
+}
+.al-optrow__hint {
+  font-family: var(--al-font-mono);
+  font-size: var(--al-text-xs);
+  color: var(--al-ink-faint);
+  text-transform: lowercase;
+}
+.al-optrow__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--al-space-2);
+}
+
+/* ── Preview header (filename + counts) ──────────────────────────── */
+
+.al-export__previewhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--al-space-3);
+}
+.al-export__file {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-2);
+  color: var(--al-ink-muted);
+  min-width: 0;
+}
+.al-export__filename {
+  font-family: var(--al-font-mono);
+  font-size: var(--al-text-sm);
+  color: var(--al-ink-dim);
+}
+.al-export__stats {
+  font-family: var(--al-font-mono);
+  font-size: var(--al-text-xs);
+  color: var(--al-ink-faint);
+  white-space: nowrap;
+}
+
+/* ── Live preview ────────────────────────────────────────────────── */
+
+.al-preview {
+  flex: 1;
+  min-height: 320px;
+  max-height: 52vh;
+  border-radius: var(--al-radius-panel);
+  background: #0d0b0f; /* inset well, a touch below --al-bg */
+  border: 1px solid var(--al-hairline);
+  box-shadow: var(--al-shadow-panel);
+  padding: var(--al-space-4) var(--al-space-5);
+  overflow: auto;
+}
+.al-preview__code {
+  font-family: var(--al-font-mono);
+  font-size: var(--al-text-sm);
+  line-height: 1.7;
+  color: var(--al-ink-dim);
+  white-space: pre;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.al-preview__line {
+  display: inline;
+}
+.al-preview__gutter {
+  display: inline-block;
+  width: 2.4em;
+  margin-right: var(--al-space-3);
+  text-align: right;
+  color: var(--al-ink-faint);
+  user-select: none;
+}
+.al-preview__text {
+  white-space: pre-wrap;
+}
+.al-preview__stamp {
+  color: var(--al-gold);
+}
+.al-preview__arrow {
+  color: var(--al-ink-faint);
+}
+/* the currently-playing ASS dialogue line, lifted out of the dim body. */
+.al-preview__line--active .al-preview__gutter {
+  color: var(--al-gold);
+}
+.al-preview__karaoke {
+  display: inline;
+}
+.al-preview__syl {
+  border-radius: 2px;
+  padding: 0 0.5px;
+  background-clip: padding-box;
+  /* snap, no overshoot: the sweep itself is currentTime-bound (linear),
+     this transition only softens style-toggle changes. */
+  transition:
+    color var(--al-dur-snap) var(--al-ease-snap),
+    background-color var(--al-dur-snap) var(--al-ease-snap);
+}
+.al-preview__syl[data-sung='true'] {
+  box-shadow: 0 0 8px var(--al-gold-glow);
+}
+
+/* ── Sweep-proof transport ───────────────────────────────────────── */
+
+.al-export__scrub {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-3);
+  padding: var(--al-space-2) var(--al-space-3);
+  border-radius: var(--al-radius-ctrl);
+  background: var(--al-surface);
+  border: 1px solid var(--al-hairline);
+}
+.al-export__scrub--live {
+  border-color: color-mix(in srgb, var(--al-gold) 24%, transparent);
+}
+.al-export__seek {
+  flex: 1;
+  appearance: none;
+  height: 3px;
+  border-radius: 3px;
+  background: var(--al-surface-2);
+  cursor: pointer;
+  outline-offset: 4px;
+}
+.al-export__seek:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.al-export__seek::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--al-gold);
+  box-shadow: 0 0 8px var(--al-gold-glow);
+  cursor: pointer;
+  transition: transform var(--al-dur-snap) var(--al-ease-snap);
+}
+.al-export__seek::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+.al-export__seek::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: none;
+  border-radius: 50%;
+  background: var(--al-gold);
+  box-shadow: 0 0 8px var(--al-gold-glow);
+  cursor: pointer;
+}
+.al-export__clock {
+  font-family: var(--al-font-mono);
+  font-size: var(--al-text-xs);
+  color: var(--al-ink-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ── Actions ─────────────────────────────────────────────────────── */
+
+.al-export__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--al-space-3);
+  margin-top: var(--al-space-2);
+}
+.al-export__buttons {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-3);
+}
+.al-export__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-3);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.al-export__routing {
+  font-family: var(--al-font-mono);
+  font-size: var(--al-text-xs);
+  color: var(--al-ink-faint);
+}
+
+/* ── Narrow window: rail collapses the two-column layout ─────────── */
+
+@media (max-width: 880px) {
+  .al-export {
+    grid-template-columns: 1fr;
+  }
+  .al-export__side {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--al-space-5);
+  }
+  .al-export__side > section {
+    flex: 1 1 240px;
+  }
+}

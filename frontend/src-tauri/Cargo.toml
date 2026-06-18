@@ -1,0 +1,46 @@
+[package]
+name = "autolyrics"
+version = "0.1.0"
+description = "AutoLyrics — 本地端歌詞辨識與對齊引擎 (桌面殼層)"
+authors = ["AutoLyrics"]
+license = "MIT"
+repository = ""
+edition = "2021"
+rust-version = "1.77.2"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+# Loosely pinned to the 2.x line — matches the tauri/plugin crates below so
+# minor updates resolve together rather than one crate lagging behind.
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+log = "0.4"
+# All tauri-* crates use a consistent loose 2.x pin so cargo resolves a
+# mutually-compatible set; run `npx tauri info` after `cargo` is available
+# to confirm the resolved versions agree.
+tauri = { version = "2", features = [] }
+tauri-plugin-log = "2"
+# 給前端 saveFile.ts 的原生「儲存」對話框 + 寫檔。前端透過
+# @tauri-apps/plugin-dialog / @tauri-apps/plugin-fs 的 JS 綁定呼叫
+# (Tauri v2 的 plugin guest-JS 不會被 withGlobalTauri 自動掛上 window.__TAURI__)。
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+
+# Windows-only: Job Object APIs to guarantee the backend child is killed
+# when the parent dies abnormally (Task Manager / taskkill /F / crash),
+# so no orphan uvicorn survives holding port 8756.
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = [
+  "Win32_Foundation",
+  "Win32_Security",          # SECURITY_ATTRIBUTES — CreateJobObjectW 簽章需要
+  "Win32_System_JobObjects",
+  "Win32_System_Threading",
+] }

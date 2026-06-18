@@ -1,0 +1,22 @@
+/* Locally-bundled Noto Serif/Sans CJK — served verbatim from /public so the
+   ~1400 unicode-range woff2 subsets never pass through the bundler's asset
+   graph (which crashes on Windows for sets this large). Loaded via a plain
+   <link> in index.html; fully offline / local-first. Each weight CSS uses
+   ./files/* urls relative to its own folder, so these resolve correctly.
+
+   Serif (document hero): TC/JP/KR 400 + 700.
+   Sans  (chrome/body):   TC/JP/KR 400 + 500. */
+
+@import "./noto-serif-tc/400.css";
+@import "./noto-serif-tc/700.css";
+@import "./noto-serif-jp/400.css";
+@import "./noto-serif-jp/700.css";
+@import "./noto-serif-kr/400.css";
+@import "./noto-serif-kr/700.css";
+
+@import "./noto-sans-tc/400.css";
+@import "./noto-sans-tc/500.css";
+@import "./noto-sans-jp/400.css";
+@import "./noto-sans-jp/500.css";
+@import "./noto-sans-kr/400.css";
+@import "./noto-sans-kr/500.css";

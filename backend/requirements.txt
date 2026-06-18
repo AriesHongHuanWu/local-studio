@@ -1,0 +1,27 @@
+# 注意:torch / torchaudio 不在這裡裝 —— 由 install.ps1 用正確的 CUDA index-url 安裝
+# (RTX 5060 / Blackwell 需要 cu128 版,一般 PyPI 的 torch 不支援 sm_120)
+
+# --- ASR ---
+faster-whisper>=1.1.0
+
+# --- 人聲分離 ---
+demucs>=4.0.1
+
+# --- 強制對齊(完整歌詞模式) ---
+# 用 torchaudio 內建的 forced_align + MMS_FA bundle(已隨 torchaudio wheel 預編譯)。
+# 刻意「不用」ctc-forced-aligner —— 它有 C++ 擴充,Windows 需 Visual C++ Build Tools 才能
+# 從原始碼建置(對一般使用者門檻太高)。torchaudio 原生路徑免編譯器、跨平台、效果相當。
+# 見 pipeline/align.py。
+#
+# 選用:uroman(純 Python、免編譯)讓「中日韓」歌詞可羅馬化後逐字對齊。
+# 沒裝也能跑——CJK 強制對齊會略過、上層 pipeline 退回 biasing。要中文逐字對齊就裝它:
+uroman>=1.3.1.1  # CJK 強制對齊需要(英文/拉丁語不需要)
+
+# --- 本地 API 服務 ---
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-multipart>=0.0.9
+
+# --- 音訊 I/O ---
+soundfile>=0.12
+numpy>=1.24

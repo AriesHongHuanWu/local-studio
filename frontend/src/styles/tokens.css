@@ -1,0 +1,72 @@
+:root {
+  /* ── Surfaces: warm graphite "dark stock", lifted by luminance only ── */
+  --al-bg:            #121013;   /* page — warm near-black paper            */
+  --al-surface:       #1A171C;   /* raised panel tier 1                     */
+  --al-surface-2:     #221E25;   /* raised panel tier 2 / inset wells       */
+  --al-hairline:      rgba(244, 241, 234, 0.07); /* the only "border"       */
+  --al-hairline-strong: rgba(244, 241, 234, 0.12);
+
+  /* ── Ink (text) ── */
+  --al-ink:           #F4F1EA;   /* warm off-white — primary document ink   */
+  --al-ink-dim:       #B7B2AE;   /* neighbour lines, secondary text         */
+  --al-ink-muted:     #908B96;   /* captions, labels, inactive tabs (≥4.5:1)*/
+  --al-ink-faint:     #8A8590;   /* hints, sub-labels, placeholders (≥4.5:1)*/
+  --al-ink-decor:     #4F4B54;   /* NON-TEXT decoration only (opacity-dimmed)*/
+
+  /* ── Semantic accents — exactly three, each carries meaning ── */
+  --al-gold:          #E8C36B;   /* HERO: playhead, word-sweep, primary CTA */
+  --al-gold-soft:     #F0D89A;   /* gold hover / sweep leading edge         */
+  --al-gold-glow:     rgba(232, 195, 107, 0.22); /* live bloom, focus ring  */
+  --al-amber:         #E0A24E;   /* WARN: low-confidence word (event-driven)*/
+  --al-amber-glow:    rgba(224, 162, 78, 0.20);
+  --al-green:         #5BD49B;   /* POSITIVE: done / GPU-online / verified   */
+  --al-green-glow:    rgba(91, 212, 155, 0.18);
+  --al-error:         #E06A5A;   /* job error / destructive only            */
+
+  /* ── Typography ── */
+  --al-font-display:  "Source Serif 4", "Noto Serif TC", "Noto Serif JP",
+                      "Noto Serif KR", "Source Han Serif", Georgia, serif;
+  --al-font-body:     "Inter", "Noto Sans TC", "Noto Sans JP",
+                      "Noto Sans KR", system-ui, sans-serif;
+  --al-font-mono:     "JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace;
+
+  /* type scale */
+  --al-lyric-active:  40px;  /* hero line in the reading view             */
+  --al-lyric-near:    26px;  /* immediate neighbours                      */
+  --al-lyric-far:     22px;  /* outer dimmed lines                        */
+  --al-text-lg:       17px;
+  --al-text-md:       14px;
+  --al-text-sm:       12.5px;
+  --al-text-xs:       11px;  /* tape-counter digits, eyebrow labels       */
+  --al-tracking-caps: 0.14em; /* eyebrow / section caps                   */
+  --al-leading-lyric: 1.5;   /* tuned up for CJK headroom                 */
+
+  /* ── Radii ── */
+  --al-radius-app:    14px;  /* outer app frame                          */
+  --al-radius-panel:  8px;
+  --al-radius-ctrl:   6px;
+  --al-radius-chip:   4px;   /* word chips = crisp tape strips           */
+
+  /* ── Spacing / layout ── */
+  --al-gutter:        56px;  /* generous document margin (the "page")     */
+  --al-pad-panel:     18px;
+  --al-rail-w:        232px; /* left tab rail                            */
+  --al-space-1: 4px;  --al-space-2: 8px;  --al-space-3: 12px;
+  --al-space-4: 16px; --al-space-5: 24px; --al-space-6: 32px;
+
+  /* ── Elevation (luminance + faint inset, never heavy drop-shadow) ── */
+  --al-shadow-panel:  0 1px 0 rgba(255,255,255,0.03) inset,
+                      0 10px 30px rgba(0,0,0,0.40);
+  --al-shadow-pop:    0 12px 40px rgba(0,0,0,0.55);
+
+  /* ── Motion: split-speed ── */
+  --al-ease-ink:      cubic-bezier(0.4, 0, 0.2, 1);   /* focus shifts      */
+  --al-ease-snap:     cubic-bezier(0.2, 0, 0, 1);     /* edit micro-ops    */
+  --al-dur-focus:     220ms;  /* line focus, tab cross-fade               */
+  --al-dur-snap:      140ms;  /* drag / nudge / seek / chip select        */
+  --al-dur-sweep:     linear; /* word-sweep bound to audio currentTime    */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --al-dur-focus: 0ms; --al-dur-snap: 0ms; }
+}
