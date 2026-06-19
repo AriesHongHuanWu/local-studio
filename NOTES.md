@@ -1,15 +1,15 @@
-# Ai Caption v0.1.1
+# Ai Caption v0.1.2
 
-The app is now **Ai Caption** — local AI captioning **and** word-level lyrics, in one tool.
+### New — 🧹 Clean Text mode
+A third top-level mode for **removing text you accidentally added to your own video** (a burned-in subtitle in the wrong spot, a mistyped title, a fixed corner caption):
 
-### New
-- **🎬 Video → Subtitles mode** — drop a video (or audio) file and get clean **SRT / WebVTT** captions, with a live caption overlay on the video and a click-to-seek cue list. No vocal separation, no reference needed.
-- **Runs on any laptop — no discrete GPU required.** On CPU / integrated graphics (e.g. Intel Core Ultra) it auto-picks a fast model and runs int8; your GPU is used automatically when one is present.
-- **Bundled Python** — no separate Python install needed. First launch sets everything up on its own.
-- **WebVTT (.vtt) export** + broadcast-style subtitle formatting (line length, ≤ 2 lines, max duration, reading-speed splitting; CJK / Latin aware).
+- **Box it, AI erases it.** Drag a box over the fixed-position text; **LaMa** inpainting fills that region with background **every frame**, and the output keeps your **original audio**.
+- **100% local & GPU-accelerated** — NVIDIA NVENC / Intel QSV / CPU encode, no system ffmpeg or cloud needed. Falls back to a fast classical method if the AI model isn't available.
+- Before/after preview, then download the cleaned `.mp4`.
 
-### Improved
-- Sharper forced alignment — per-character Mandarin (pinyin) / Cantonese (jyutping) and an English double-letter fix.
-- 🎵 **Song lyrics mode** (Demucs → Whisper → forced-align → LRC / ASS karaoke) is unchanged and still here.
+> v1 targets **fixed-position** text. Moving/animated text is a later step. The LaMa model (~196 MB) downloads automatically on first use.
+
+### Also
+- 🎵 Song lyrics and 🎬 Video → Subtitles modes are unchanged.
 
 100% local — nothing is uploaded. MIT © 2026 Aries HongHuan Wu.
