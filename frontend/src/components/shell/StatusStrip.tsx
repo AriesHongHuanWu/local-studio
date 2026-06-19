@@ -1,9 +1,12 @@
+import { useEffect, useState } from 'react';
 import { Cpu, WifiOff } from 'lucide-react';
 import { Badge } from '../primitives';
 import { useMeta } from '../../state/useMeta';
 import type { TabKey } from './tabs';
 import { TABS } from './tabs';
 import { useT, LanguageToggle } from '../../i18n';
+
+const IN_TAURI = '__TAURI_INTERNALS__' in window;
 
 export interface StatusStripProps {
   activeTab: TabKey;
@@ -15,6 +18,18 @@ export function StatusStrip({ activeTab }: StatusStripProps) {
   const online = useMeta((s) => s.online);
   const t = useT();
   const tab = TABS.find((t2) => t2.key === activeTab);
+
+  // The authoritative version is the Tauri app version (from tauri.conf), NOT
+  // the backend's /api/meta version (which is hardcoded and lagged). Read it
+  // once inside the desktop app; fall back to meta.version in plain browser/dev.
+  const [appVersion, setAppVersion] = useState<string | null>(null);
+  useEffect(() => {
+    if (!IN_TAURI) return;
+    import('@tauri-apps/api/app')
+      .then(({ getVersion }) => getVersion())
+      .then(setAppVersion)
+      .catch(() => {});
+  }, []);
 
   return (
     <div className="al-status">
@@ -38,7 +53,7 @@ export function StatusStrip({ activeTab }: StatusStripProps) {
             <WifiOff size={12} strokeWidth={2} /> {t('common.status.offline')}
           </Badge>
         )}
-        <span className="al-status__version">v{meta.version}</span>
+        <span className="al-status__version">v{appVersion ?? meta.version}</span>
         <LanguageToggle />
       </div>
     </div>

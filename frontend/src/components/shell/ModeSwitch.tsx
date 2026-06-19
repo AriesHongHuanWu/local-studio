@@ -89,11 +89,13 @@ export function ModeSwitch({ collapsed = false }: ModeSwitchProps) {
             onClick={() => setMode(m.mode)}
             onKeyDown={(e) => onKeyDown(e, i)}
             title={t(m.titleKey)}
+            aria-label={t(m.labelKey)}
           >
+            {/* Icon-only — labels were too cramped in the narrow rail and got
+                truncated ("歌.."). The mode name lives in title + aria-label. */}
             <span className="al-modesw__icon" aria-hidden="true">
-              <Icon size={14} strokeWidth={1.9} />
+              <Icon size={16} strokeWidth={1.9} />
             </span>
-            <span className="al-modesw__label">{t(m.labelKey)}</span>
           </button>
         );
       })}

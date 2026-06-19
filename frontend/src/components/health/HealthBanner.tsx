@@ -167,15 +167,19 @@ export function HealthBanner() {
   const autoStartedSig = useRef<string>('');
   const requiredSig = useMemo(() => signatureOf(missingRequired), [missingRequired]);
   useEffect(() => {
-    if (!loaded || !hasRequired || repairing) return;
+    if (!loaded || repairing) return;
     if (autoStartedSig.current === requiredSig) return;
-    autoStartedSig.current = requiredSig;
-    // Repair only the REQUIRED missing pieces automatically.
-    const reqModels = missingModels.filter((m) => m.required);
+    // Auto-repair ONLY missing required DEPS. NEVER auto-download models here —
+    // each model fetches on demand the first time a feature actually needs it,
+    // so auto-pulling every "required" model would download several GB (whisper
+    // + demucs + aligner …) the user may never use. Missing models are surfaced
+    // as a dismissible note instead, with a manual download.
     const reqDeps = missingDeps.filter((m) => m.required);
-    void repair({ models: reqModels, deps: reqDeps });
+    if (reqDeps.length === 0) return;
+    autoStartedSig.current = requiredSig;
+    void repair({ models: [], deps: reqDeps });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loaded, hasRequired, requiredSig, repairing]);
+  }, [loaded, requiredSig, repairing]);
 
   // ── aggregated progress across model downloads + setup ───────────────
   // Build the set of model ids currently being repaired (those with a
