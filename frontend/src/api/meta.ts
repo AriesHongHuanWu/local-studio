@@ -40,6 +40,8 @@ export const FALLBACK_META: Meta = {
   gpu: true,
   demucs: true,
   aligner: true,
+  caption: true,
+  captionTemplates: ['clean', 'karaoke', 'bold'],
   version: '0.1.0-local',
 };
 

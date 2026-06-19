@@ -14,6 +14,27 @@
 import type { Entry } from '../types';
 
 export const video: Record<string, Entry> = {
+  // ── Caption burn-in (動態字幕燒錄 / hard-sub) ──
+  'caption.title': { zh: '動態字幕燒錄', en: 'Burn captions into video' },
+  'caption.lede': {
+    zh: '把逐字字幕直接燒進影片，輸出可直接上傳社群的 MP4（保留原音軌）。',
+    en: 'Bake word-by-word captions into the video — a ready-to-post MP4 (original audio kept).',
+  },
+  'caption.styleAria': { zh: '字幕樣式', en: 'Caption style' },
+  'caption.tpl.clean': { zh: '乾淨', en: 'Clean' },
+  'caption.tpl.karaoke': { zh: '卡拉OK', en: 'Karaoke' },
+  'caption.tpl.bold': { zh: '社群粗體', en: 'Bold' },
+  'caption.tplDesc.clean': { zh: '白字＋黑框，正在說的字轉金色', en: 'White + outline, current word gold' },
+  'caption.tplDesc.karaoke': { zh: '已過白／現在金／未到灰', en: 'Sung white · now gold · ahead gray' },
+  'caption.tplDesc.bold': { zh: '正在說的字加金色色塊', en: 'Current word in a gold block' },
+  'caption.start': { zh: '燒錄字幕', en: 'Burn captions' },
+  'caption.running': { zh: '燒錄中…', en: 'Burning…' },
+  'caption.rerun': { zh: '重新燒錄', en: 'Burn again' },
+  'caption.preparing': { zh: '準備中…', en: 'Preparing…' },
+  'caption.download': { zh: '下載 MP4', en: 'Download MP4' },
+  'caption.error.job': { zh: '字幕燒錄失敗', en: 'Caption burn failed' },
+  'caption.error.offline': { zh: '連不上本機後端', en: 'Cannot reach local backend' },
+
   // ── Mode-aware Transcribe header ──
   'video.title': { zh: '影片字幕', en: 'Video → Subtitles' },
   'video.lede': {

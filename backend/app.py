@@ -107,6 +107,24 @@ def _inpaint_available() -> bool:
         return False
 
 
+# 動態字幕燒錄 (hard-sub) 子模組 —— 同樣防禦式載入 (相依 av / numpy / PIL)。
+try:
+    from pipeline import caption as caption  # type: ignore[no-redef]
+except Exception as _e:  # pragma: no cover
+    logger.error("無法載入 pipeline.caption:%r — 字幕燒錄停用,其餘 API 正常。", _e)
+    caption = None  # type: ignore[assignment]
+
+
+def _caption_available() -> bool:
+    """字幕燒錄是否可用 (模組載入成功且其 is_available() 為真)。"""
+    if caption is None:
+        return False
+    try:
+        return bool(caption.is_available())
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def _gpu_available() -> bool:
     """torch.cuda 是否可用 (torch 未安裝 → False,絕不丟例外)。"""
     try:
@@ -428,6 +446,10 @@ _MODEL_JOBS_LOCK = threading.Lock()
 # }
 INPAINT_JOBS: dict[str, dict[str, Any]] = {}
 _INPAINT_JOBS_LOCK = threading.Lock()
+
+# 動態字幕燒錄 (caption) 作業 in-memory 登記表 (結構同 INPAINT_JOBS)。
+CAPTION_JOBS: dict[str, dict[str, Any]] = {}
+_CAPTION_JOBS_LOCK = threading.Lock()
 
 
 def _gpu_vram_total_mb() -> Optional[int]:
@@ -812,6 +834,8 @@ def api_meta() -> JSONResponse:
             "demucs": _demucs_available(),
             "aligner": _aligner_available(),
             "inpaint": _inpaint_available(),
+            "caption": _caption_available(),
+            "captionTemplates": caption.templates() if caption is not None else ["clean", "karaoke", "bold"],
             "installedWhisper": _installed_whisper_sizes(),
             "version": VERSION,
         }
@@ -1563,6 +1587,181 @@ def api_get_inpaint_result(job_id: str) -> FileResponse:
         media_type="video/mp4",
         filename="cleaned.mp4",
     )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 動態字幕燒錄 (caption / hard-sub) 端點群 —— 把辨識結果的逐字字幕燒進影片。
+# 重相依 (av/numpy/PIL) 缺席時回 503 / avail=false,絕不崩潰。
+# ─────────────────────────────────────────────────────────────────────────────
+def _require_caption() -> None:
+    if not _caption_available():
+        raise HTTPException(
+            status_code=503,
+            detail="字幕燒錄功能不可用 (缺 PyAV/numpy/PIL)。請重新執行安裝以取得相依套件。",
+        )
+
+
+def _make_caption_progress(job_id: str):
+    def progress(stage: str, pct: float, message: str = "") -> None:
+        with _CAPTION_JOBS_LOCK:
+            job = CAPTION_JOBS.get(job_id)
+            if job is None:
+                return
+            if job["status"] in ("queued", "running"):
+                job["status"] = "running"
+            try:
+                job["pct"] = max(0.0, min(100.0, float(pct)))
+            except (TypeError, ValueError):
+                pass
+            if message:
+                job["message"] = str(message)
+
+    return progress
+
+
+def _run_caption_job(
+    job_id: str,
+    video_path: str,
+    out_path: str,
+    segments: list[dict],
+    template: str,
+) -> None:
+    """背景執行緒主體:跑 caption.burn_captions,完成/失敗都回寫 CAPTION_JOBS。"""
+    progress = _make_caption_progress(job_id)
+    try:
+        progress("caption", 0.0, "準備中…")
+        if caption is None:  # pragma: no cover - 已由 _require_caption 擋住
+            raise RuntimeError("pipeline.caption 不可用")
+        result = caption.burn_captions(
+            video_path,
+            segments,
+            out_path,
+            template=template,
+            device="auto",
+            progress=progress,
+        )
+        with _CAPTION_JOBS_LOCK:
+            job = CAPTION_JOBS.get(job_id)
+            if job is not None:
+                job["status"] = "done"
+                job["pct"] = 100.0
+                job["message"] = "完成 Done"
+                job["meta"] = result
+                job["error"] = None
+        logger.info("字幕燒錄工作 %s 完成。", job_id)
+    except Exception as e:  # noqa: BLE001
+        tb = traceback.format_exc()
+        logger.error("字幕燒錄工作 %s 失敗:%s\n%s", job_id, e, tb)
+        with _CAPTION_JOBS_LOCK:
+            job = CAPTION_JOBS.get(job_id)
+            if job is not None:
+                job["status"] = "error"
+                job["message"] = str(e)
+                job["error"] = str(e)
+    finally:
+        try:
+            if video_path and os.path.exists(video_path):
+                os.remove(video_path)
+        except OSError:
+            pass
+
+
+@app.post("/api/caption")
+async def api_caption(
+    video: UploadFile = File(...),
+    segments: str = Form(...),
+    template: str = Form("clean"),
+) -> JSONResponse:
+    """建立字幕燒錄工作。multipart:video=影片,segments=JSON 字串
+    (辨識結果的 segments 陣列,含 words 逐字時間),template=clean|karaoke|bold。
+
+    回傳 { jobId };背景執行緒跑 caption.burn_captions → 暫存 <jobId>.mp4。
+    """
+    _require_caption()
+
+    # 1) 解析 segments JSON
+    try:
+        parsed = json.loads(segments) if segments else []
+        if not isinstance(parsed, list) or not parsed:
+            raise ValueError("segments 必須是非空陣列")
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=f"segments 解析失敗:{e}") from e
+
+    tpl = (template or "clean").strip().lower()
+    valid_templates = caption.templates() if caption is not None else ["clean"]  # type: ignore[union-attr]
+    if tpl not in valid_templates:
+        tpl = "clean"
+
+    # 2) 存上傳影片
+    job_id = uuid.uuid4().hex
+    suffix = _safe_upload_suffix(video.filename)
+    src = UPLOAD_DIR / f"caption_{job_id}{suffix}"
+    out = UPLOAD_DIR / f"cap_{job_id}.mp4"
+    try:
+        data = await video.read()
+        if not data:
+            raise HTTPException(status_code=400, detail="上傳的影片是空的")
+        src.write_bytes(data)
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=f"上傳影片儲存失敗:{e}") from e
+    finally:
+        await video.close()
+
+    # 3) 登記工作 + 起背景執行緒
+    with _CAPTION_JOBS_LOCK:
+        CAPTION_JOBS[job_id] = {
+            "status": "queued",
+            "pct": 0.0,
+            "message": "已建立工作,等待開始…",
+            "error": None,
+            "meta": None,
+            "_video_path": str(src),
+            "_out_path": str(out),
+        }
+
+    thread = threading.Thread(
+        target=_run_caption_job,
+        args=(job_id, str(src), str(out), parsed, tpl),
+        name=f"autolyrics-caption-{job_id[:8]}",
+        daemon=True,
+    )
+    thread.start()
+
+    return JSONResponse({"jobId": job_id})
+
+
+@app.get("/api/caption/jobs/{job_id}")
+def api_get_caption_job(job_id: str) -> JSONResponse:
+    """輪詢字幕燒錄工作狀態。GET /api/caption/jobs/{jobId}"""
+    with _CAPTION_JOBS_LOCK:
+        job = CAPTION_JOBS.get(job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="找不到此字幕燒錄工作 jobId")
+        payload: dict[str, Any] = {
+            "status": job["status"],
+            "pct": job["pct"],
+            "message": job["message"],
+            "error": job.get("error"),
+            "meta": job.get("meta"),
+        }
+    return JSONResponse(payload)
+
+
+@app.get("/api/caption/jobs/{job_id}/result")
+def api_get_caption_result(job_id: str) -> FileResponse:
+    """下載字幕燒錄輸出的 mp4。GET /api/caption/jobs/{jobId}/result"""
+    with _CAPTION_JOBS_LOCK:
+        job = CAPTION_JOBS.get(job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="找不到此字幕燒錄工作 jobId")
+        if job["status"] != "done":
+            raise HTTPException(status_code=404, detail="工作尚未完成,結果尚未就緒")
+        out_path = job.get("_out_path")
+    if not out_path or not os.path.exists(out_path):
+        raise HTTPException(status_code=404, detail="找不到輸出檔案")
+    return FileResponse(out_path, media_type="video/mp4", filename="captioned.mp4")
 
 
 # ─────────────────────────────────────────────────────────────────────────────

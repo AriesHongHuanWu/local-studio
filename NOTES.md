@@ -1,16 +1,17 @@
-# Ai Caption v0.1.6
+# Ai Caption v0.1.7
 
-A new switchable **Precision mode** for noticeably more accurate lyrics/subtitles — old behaviour stays one click away.
+🔥 The big one — **burn word-by-word captions straight into your video** and export a ready-to-post MP4.
 
 ### New
-- **🎯 Precision mode** (精準模式) — a toggle on the 辨識 page (both 歌曲歌詞 and 影片字幕). When on, decoding is tuned for singing and long audio:
-  - **Hotword biasing from your reference lyrics** — and crucially it's **re-applied to every 30-second window**, unlike the old prompt which only nudged the first ~30s and then faded. This is the big fix for "I pasted some lyrics but it still got them wrong" on longer songs.
-  - **Anti-hallucination** — suppresses the repeat/loop "rambling" Whisper tends to do on sung vocals.
-  - **Wider beam search** — explores more candidates on tricky passages.
-  - Slower, but more accurate. **Off by default** — flip it on when you want the extra accuracy; everything else behaves exactly as before.
+- **🔥 動態字幕燒錄 / Burn captions into video** — in 影片字幕 mode, once a video is transcribed, a new panel lets you bake the **word-level captions** right into the picture and download a finished MP4 (original audio kept). Three styles:
+  - **乾淨 (Clean)** — white text + outline, the word being spoken turns gold.
+  - **卡拉OK (Karaoke)** — already-said words white, current word gold, upcoming words gray. Classic word-by-word fill.
+  - **社群粗體 (Bold)** — the current word sits in a gold highlight block (TikTok / Reels look).
+- Because the highlight is driven by Ai Caption's **word-level timing**, the colour lands on the exact word as it's said/sung — the same thing paid tools charge a monthly fee for, done **100% locally and free**.
+- Renders with the bundled video encoder (NVIDIA / Intel / CPU), finds your system CJK font automatically, and keeps the original audio untouched.
 
-### Tip for best accuracy
-- If you have the **complete** lyrics, use **強制對齊 (Forced align)** — it takes your lyrics as the truth and only solves the timing, so the words are 100% right. Precision mode helps most when you only have **partial** lyrics or none.
+### Tip
+- For lyric videos, run **精準模式** (or **強制對齊** with full lyrics) first for the tightest word timing, then burn — the captions will snap perfectly to the beat.
 
 ### Unchanged
 - 100% local — nothing is uploaded. Runs on no-GPU laptops (CPU int8 / Intel Core Ultra).

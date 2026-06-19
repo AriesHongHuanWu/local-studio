@@ -39,6 +39,10 @@ export interface Meta {
   gpu: boolean;
   demucs: boolean;
   aligner: boolean;
+  /** Caption burn-in (hard-sub) available (PyAV + PIL). Optional — older backends omit it. */
+  caption?: boolean;
+  /** Available caption style templates (e.g. ['clean','karaoke','bold']). */
+  captionTemplates?: string[];
   version: string;
 }
 

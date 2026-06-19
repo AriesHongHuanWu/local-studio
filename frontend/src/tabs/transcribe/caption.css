@@ -1,0 +1,118 @@
+/* ──────────────────────────────────────────────────────────────────
+   Caption burn-in (動態字幕燒錄) panel — template picker, progress bar,
+   result video. Same "ink on dark stock" system as the rest of the app.
+   Reuses .al-clean__progress* / .al-clean__video* from clean.css.
+   ────────────────────────────────────────────────────────────────── */
+
+.al-capburn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-4);
+  padding: var(--al-pad-panel);
+  border-radius: var(--al-radius-panel);
+  background: var(--al-surface);
+  border: 1px solid var(--al-hairline);
+  box-shadow: var(--al-shadow-panel);
+}
+
+.al-capburn__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--al-space-3);
+}
+.al-capburn__icon {
+  color: var(--al-gold);
+  flex: none;
+  margin-top: 2px;
+}
+.al-capburn__title {
+  font-size: var(--al-text-md);
+  font-weight: 600;
+  color: var(--al-ink);
+}
+.al-capburn__lede {
+  margin: 2px 0 0;
+  font-size: var(--al-text-sm);
+  color: var(--al-ink-faint);
+}
+
+/* ── template picker ── */
+.al-capburn__templates {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--al-space-2);
+}
+@media (max-width: 560px) {
+  .al-capburn__templates {
+    grid-template-columns: 1fr;
+  }
+}
+.al-capburn__tpl {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: left;
+  padding: var(--al-space-3);
+  border-radius: var(--al-radius-ctrl);
+  border: 1px solid var(--al-hairline-strong);
+  background: var(--al-surface-2);
+  color: var(--al-ink-dim);
+  cursor: pointer;
+  transition:
+    border-color var(--al-dur-snap) var(--al-ease-snap),
+    background var(--al-dur-snap) var(--al-ease-snap),
+    color var(--al-dur-snap) var(--al-ease-snap);
+}
+.al-capburn__tpl:hover:not(.al-capburn__tpl--active):not(:disabled) {
+  border-color: var(--al-ink-faint);
+  color: var(--al-ink);
+}
+.al-capburn__tpl--active {
+  border-color: color-mix(in srgb, var(--al-gold) 55%, transparent);
+  background: var(--al-gold-glow);
+  color: var(--al-ink);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--al-gold) 30%, transparent) inset;
+}
+.al-capburn__tpl:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.al-capburn__tpl:focus-visible {
+  outline: 1px solid var(--al-gold);
+  outline-offset: 2px;
+}
+.al-capburn__tplname {
+  font-size: var(--al-text-sm);
+  font-weight: 600;
+}
+.al-capburn__tpldesc {
+  font-size: var(--al-text-xs);
+  color: var(--al-ink-faint);
+}
+
+.al-capburn__actions {
+  display: flex;
+  gap: var(--al-space-2);
+}
+
+/* ── progress bar (shared look, local class) ── */
+.al-progressbar {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--al-surface-2);
+  overflow: hidden;
+}
+.al-progressbar__fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--al-gold);
+  transition: width var(--al-dur-focus) var(--al-ease-ink);
+}
+
+.al-capburn__result {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-3);
+  animation: al-reveal var(--al-dur-focus) var(--al-ease-ink);
+}

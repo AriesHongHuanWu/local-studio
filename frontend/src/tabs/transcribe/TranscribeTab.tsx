@@ -13,6 +13,7 @@ import { StageProgress } from './StageProgress';
 import { SetupBanner } from './SetupBanner';
 import { VideoPreview } from './VideoPreview';
 import { CueList } from './CueList';
+import { CaptionBurn } from './CaptionBurn';
 import { CleanTextFlow } from './CleanTextFlow';
 import { useMeta } from '../../state/useMeta';
 import { useJob } from '../../state/useJob';
@@ -503,6 +504,9 @@ export function TranscribeTab({ onOpenEditor }: TranscribeTabProps) {
             <Eyebrow num={3}>{t('video.section.preview')}</Eyebrow>
             <VideoPreview file={file} />
             {status === 'done' && result && <CueList result={result} />}
+            {status === 'done' && result && result.segments.length > 0 && meta.caption !== false && (
+              <CaptionBurn file={file} result={result} templates={meta.captionTemplates} />
+            )}
           </section>
         )}
 
