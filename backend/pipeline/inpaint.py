@@ -148,6 +148,96 @@ def _inpaint_region_cv2(frame_rgb: "np.ndarray", box_px: tuple[int, int, int, in
 
 
 # --------------------------------------------------------------------------- #
+# 動態追蹤 (template matching) —— 移動文字 / 浮水印 / 物件
+# --------------------------------------------------------------------------- #
+# track=True 時,使用者只框「第一幀」的那一個框;我們把框內(灰階)當作「模板」,
+# 之後每幀在「上一幀框位置附近」的搜尋窗內用 cv2.matchTemplate 找出模板的新位置,
+# 再於該位置 inpaint。模板**全程不更新**(更新會累積漂移;來源幀裡物件始終可見,
+# 原始模板就一直比得中)。
+#
+# cv2 的專用追蹤器 (CSRT/KCF) 不在此 build —— 改用 matchTemplate,對剛性(不變形)
+# 的文字/浮水印/logo 最穩。
+# --------------------------------------------------------------------------- #
+
+# 匹配信心低於此值視為「丟失鎖定」,沿用上一幀框位置(不亂跳)。
+_TRACK_MIN_SCORE = 0.30
+# 搜尋窗相對模板尺寸外擴的比例(越大越能追快速移動,但越慢/越易誤匹配)。
+_TRACK_MARGIN_RATIO = 0.6
+
+
+class _TemplateTracker:
+    """以原始模板做 template matching 的單框追蹤器。
+
+    用法:首個 in-range 幀呼叫 ``init(gray, box)`` 擷取模板;之後每幀呼叫
+    ``update(gray)`` 取得新框位置 (x, y, w, h)。任何步驟出錯都回上一個已知框
+    (絕不丟例外、絕不讓主流程崩潰)。
+    """
+
+    def __init__(self, frame_w: int, frame_h: int) -> None:
+        self.W = int(frame_w)
+        self.H = int(frame_h)
+        self.template: Optional["np.ndarray"] = None
+        self.tw = 0
+        self.th = 0
+        # 上一幀已知框左上角
+        self.x = 0
+        self.y = 0
+
+    def _clamp_xy(self, x: int, y: int) -> tuple[int, int]:
+        x = max(0, min(int(x), max(0, self.W - self.tw)))
+        y = max(0, min(int(y), max(0, self.H - self.th)))
+        return x, y
+
+    def init(self, gray: "np.ndarray", box_px: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
+        """從首幀灰階影像擷取模板。回傳夾限後的初始框 (x, y, w, h)。"""
+        x, y, w, h = box_px
+        # 夾限框到畫面內,模板尺寸 = 夾限後的 (w, h)
+        x0 = max(0, min(int(x), self.W - 1))
+        y0 = max(0, min(int(y), self.H - 1))
+        x1 = max(x0 + 1, min(int(x + w), self.W))
+        y1 = max(y0 + 1, min(int(y + h), self.H))
+        tmpl = gray[y0:y1, x0:x1]
+        self.template = np.ascontiguousarray(tmpl)
+        self.th, self.tw = self.template.shape[:2]
+        self.x, self.y = x0, y0
+        return (self.x, self.y, self.tw, self.th)
+
+    def update(self, gray: "np.ndarray") -> tuple[int, int, int, int]:
+        """在上一框附近的搜尋窗內比對模板,回傳新框 (x, y, w, h)。
+
+        丟失鎖定 (maxVal < _TRACK_MIN_SCORE) 或任何例外 → 沿用上一框位置。
+        """
+        if self.template is None or self.tw <= 0 or self.th <= 0:
+            return (self.x, self.y, self.tw, self.th)
+        try:
+            import cv2  # type: ignore
+
+            margin = int(max(self.tw, self.th) * _TRACK_MARGIN_RATIO)
+            # 搜尋窗 = 上一框 ± margin,夾限到畫面
+            sx0 = max(0, self.x - margin)
+            sy0 = max(0, self.y - margin)
+            sx1 = min(self.W, self.x + self.tw + margin)
+            sy1 = min(self.H, self.y + self.th + margin)
+            # 搜尋窗必須至少能容下模板,否則退回整幀比對
+            if (sx1 - sx0) < self.tw or (sy1 - sy0) < self.th:
+                sx0, sy0, sx1, sy1 = 0, 0, self.W, self.H
+            window = gray[sy0:sy1, sx0:sx1]
+            if window.shape[0] < self.th or window.shape[1] < self.tw:
+                return (self.x, self.y, self.tw, self.th)
+            res = cv2.matchTemplate(window, self.template, cv2.TM_CCOEFF_NORMED)
+            _minVal, maxVal, _minLoc, maxLoc = cv2.minMaxLoc(res)
+            if maxVal is None or maxVal < _TRACK_MIN_SCORE:
+                # 丟失鎖定 → 不跳,沿用上一框位置
+                return (self.x, self.y, self.tw, self.th)
+            nx = sx0 + int(maxLoc[0])
+            ny = sy0 + int(maxLoc[1])
+            self.x, self.y = self._clamp_xy(nx, ny)
+        except Exception:  # noqa: BLE001 - 追蹤失敗一律沿用上一框,絕不崩潰
+            logger.debug("template-match 追蹤丟例外,沿用上一框", exc_info=True)
+        return (self.x, self.y, self.tw, self.th)
+
+
+# --------------------------------------------------------------------------- #
 # 影片編碼器挑選
 # --------------------------------------------------------------------------- #
 _ENCODER_CHAIN_GPU = ["h264_nvenc", "h264_qsv", "libx264", "mpeg4"]
@@ -177,6 +267,7 @@ def remove_text(
     device: str = "auto",
     time_range: Optional[tuple[float, float]] = None,
     pad: int = 10,
+    track: bool = False,
     progress: Optional[ProgressFn] = None,
 ) -> dict:
     """逐幀移除 ``regions`` 圈出的文字,輸出保留原音軌的新影片。
@@ -192,10 +283,14 @@ def remove_text(
     time_range: (start_sec, end_sec) 只在此區間套用修補;None = 全片。
         區間外的幀**原樣**輸出(仍重編碼,確保連續)。
     pad: LaMa 修補時框外擴的像素邊界。
+    track: **動態追蹤模式**。True 且**恰好一個** region 時,把使用者在「第一幀」框出
+        的框內當作模板 (cv2.matchTemplate),逐幀追蹤該移動文字/浮水印/物件的位置並
+        於追蹤位置 inpaint。track=False(預設)= 固定位置整片同框,行為與舊版完全相同。
+        track=True 但 region 數 != 1 時,**退回固定多框**行為(不追蹤)。
 
     回傳
     ----
-    {"outPath","frames","encoder","engineUsed","width","height","durationSec"}
+    {"outPath","frames","encoder","engineUsed","width","height","durationSec","tracked"}
     """
     if not _HAS_AV:
         raise RuntimeError("PyAV/numpy 不可用,無法處理影片")
@@ -232,9 +327,14 @@ def remove_text(
         if not boxes_px:
             raise ValueError("沒有有效的像素區域")
 
+        # 動態追蹤:只在 track=True 且恰好一個有效框時啟用;否則退回固定多框。
+        do_track = bool(track) and len(boxes_px) == 1
+        tracker: Optional["_TemplateTracker"] = _TemplateTracker(W, H) if do_track else None
+        tracker_init = False  # 模板尚未在首個 in-range 幀擷取
+
         encoder = _pick_encoder(dev)
-        logger.info("inpaint:%dx%d @%.3ffps  encoder=%s  engine=%s  boxes=%d",
-                    W, H, float(rate), encoder, engine_used, len(boxes_px))
+        logger.info("inpaint:%dx%d @%.3ffps  encoder=%s  engine=%s  boxes=%d  track=%s",
+                    W, H, float(rate), encoder, engine_used, len(boxes_px), do_track)
 
         out_c = av.open(out_path, mode="w")  # type: ignore[union-attr]
         out_v = out_c.add_stream(encoder, rate=rate)
@@ -265,11 +365,31 @@ def remove_text(
                         in_range = (tsec >= t0) and (t1 is None or tsec <= t1)
                     if in_range:
                         img = np.ascontiguousarray(img)
-                        for box in boxes_px:
+                        if tracker is not None:
+                            # 動態追蹤:於追蹤到的單框位置 inpaint。
+                            try:
+                                import cv2  # type: ignore
+
+                                gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+                                if not tracker_init:
+                                    # 首個 in-range 幀:擷取模板,框位置 = 使用者框。
+                                    box = tracker.init(gray, boxes_px[0])
+                                    tracker_init = True
+                                else:
+                                    box = tracker.update(gray)
+                            except Exception:  # noqa: BLE001 - 追蹤出錯沿用上一框,絕不崩潰
+                                logger.debug("追蹤幀處理出錯,沿用上一框", exc_info=True)
+                                box = (tracker.x, tracker.y, tracker.tw, tracker.th)
                             if lama is not None:
                                 img = _inpaint_region_lama(lama, img, box, pad)
                             else:
                                 img = _inpaint_region_cv2(img, box, pad)
+                        else:
+                            for box in boxes_px:
+                                if lama is not None:
+                                    img = _inpaint_region_lama(lama, img, box, pad)
+                                else:
+                                    img = _inpaint_region_cv2(img, box, pad)
                     nf = av.VideoFrame.from_ndarray(img, format="rgb24")  # type: ignore[union-attr]
                     for p in out_v.encode(nf):
                         out_c.mux(p)
@@ -298,6 +418,7 @@ def remove_text(
             "width": W,
             "height": H,
             "durationSec": round(dur, 3),
+            "tracked": bool(do_track),
         }
     finally:
         try:

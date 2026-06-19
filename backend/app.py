@@ -1336,11 +1336,15 @@ def _run_inpaint_job(
     regions: list[dict],
     engine: str,
     time_range: Optional[tuple[float, float]],
+    track: bool = False,
 ) -> None:
     """背景執行緒主體:跑 inpaint.remove_text,完成/失敗都回寫 INPAINT_JOBS。
 
     來源影片在結束時清掉;輸出 mp4 保留供 result 端點下載 (由前端取走後再清,
     或隨暫存目錄被作業系統回收)。永不讓伺服器崩潰。
+
+    track=True 且恰好一個 region 時 → 動態追蹤該移動文字/浮水印的位置逐幀抹除
+    (見 inpaint.remove_text 的 track 參數);否則固定位置整片同框。
     """
     progress = _make_inpaint_progress(job_id)
     try:
@@ -1354,6 +1358,7 @@ def _run_inpaint_job(
             engine=engine,
             device="auto",
             time_range=time_range,
+            track=track,
             progress=progress,
         )
         with _INPAINT_JOBS_LOCK:
@@ -1432,9 +1437,14 @@ async def api_inpaint(
     engine: str = Form("lama"),
     startSec: Optional[float] = Form(None),
     endSec: Optional[float] = Form(None),
+    track: bool = Form(False),
 ) -> JSONResponse:
     """建立文字移除工作。multipart:video=影片,regions=JSON 字串
-    ([{x,y,w,h} 正規化 0..1]),engine=lama|opencv,選用 startSec/endSec。
+    ([{x,y,w,h} 正規化 0..1]),engine=lama|opencv,選用 startSec/endSec/track。
+
+    track=true 且**恰好一個** region 時 = **動態追蹤**:把使用者在第一幀框出的框
+    內當模板,逐幀以 cv2.matchTemplate 追蹤移動文字/浮水印/物件並於追蹤位置抹除。
+    track=false(預設)或 region 數 != 1 時 = 固定位置整片同框(行為與舊版相同)。
 
     回傳 { jobId };背景執行緒跑 inpaint.remove_text → 暫存 <jobId>.mp4。
     """
@@ -1503,7 +1513,7 @@ async def api_inpaint(
 
     thread = threading.Thread(
         target=_run_inpaint_job,
-        args=(job_id, str(src), str(out), clean_regions, eng, time_range),
+        args=(job_id, str(src), str(out), clean_regions, eng, time_range, bool(track)),
         name=f"autolyrics-inpaint-{job_id[:8]}",
         daemon=True,
     )

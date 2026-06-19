@@ -37,6 +37,23 @@ export const clean: Record<string, Entry> = {
   // ── Frame fetch ──
   'clean.frame.loading': { zh: '正在擷取畫面…', en: 'Grabbing a frame…' },
 
+  // ── Fixed vs Moving (track) mode ──
+  'clean.mode.ariaLabel': { zh: '固定位置或會移動切換', en: 'Fixed or moving toggle' },
+  'clean.mode.fixed': { zh: '固定位置', en: 'Fixed' },
+  'clean.mode.moving': { zh: '會移動（追蹤）', en: 'Moving (track)' },
+  'clean.mode.explainFixed': {
+    zh: '固定位置：每一幀都在同一處移除。',
+    en: 'Fixed: removed in the same spot on every frame.',
+  },
+  'clean.mode.explainMoving': {
+    zh: '會移動：自動追蹤該物件，跟著它移除（最適合會移動的剛性文字／浮水印）。',
+    en: 'Moving: follows the object across the clip (best for rigid moving text/watermarks).',
+  },
+  'clean.mode.movingHint': {
+    zh: '追蹤模式只需框一個會移動的物件',
+    en: 'Tracking mode: box just the one moving object',
+  },
+
   // ── Box canvas ──
   'clean.box.ariaLabel': { zh: '在畫面上框出要移除的文字', en: 'Box the text to remove on the frame' },
   'clean.box.hint': { zh: '在文字上拉一個框', en: 'Drag a box over the text' },

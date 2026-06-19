@@ -48,6 +48,9 @@ export function CleanTextFlow() {
   const [frameSize, setFrameSize] = useState<{ w: number; h: number }>({ w: 16, h: 9 });
   const [regions, setRegions] = useState<InpaintRegion[]>([]);
 
+  // ── fixed vs moving (track) mode ── default fixed
+  const [trackMode, setTrackMode] = useState(false);
+
   // ── engine + job ──
   const [engine, setEngine] = useState<InpaintEngine>('lama');
   const [phase, setPhase] = useState<Phase>('idle');
@@ -73,6 +76,20 @@ export function CleanTextFlow() {
       if (frameUrl) URL.revokeObjectURL(frameUrl);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // In moving mode only ONE box is allowed: keep the first if more arrive.
+  const onRegionsChange = useCallback(
+    (next: InpaintRegion[]) => {
+      setRegions(trackMode && next.length > 1 ? next.slice(0, 1) : next);
+    },
+    [trackMode],
+  );
+
+  // Switch fixed ⇄ moving. Entering moving trims to a single box.
+  const selectMode = useCallback((moving: boolean) => {
+    setTrackMode(moving);
+    if (moving) setRegions((r) => (r.length > 1 ? r.slice(0, 1) : r));
   }, []);
 
   const resetJob = useCallback(() => {
@@ -213,7 +230,7 @@ export function CleanTextFlow() {
     setMessage('');
     setErrorMsg(null);
     setResultUrl(null);
-    void createInpaintJob(file, regions, engine)
+    void createInpaintJob(file, regions, engine, undefined, undefined, undefined, trackMode)
       .then(({ jobId: id }) => {
         if (stoppedRef.current) return;
         setJobId(id);
@@ -230,7 +247,7 @@ export function CleanTextFlow() {
         setErrorMsg(msg);
         setPhase('error');
       });
-  }, [file, regions, engine, poll, t]);
+  }, [file, regions, engine, trackMode, poll, t]);
 
   const running = phase === 'running';
   const canRun = !!file && phase === 'ready' && regions.length > 0;
@@ -266,12 +283,44 @@ export function CleanTextFlow() {
         {file && frameUrl && (phase === 'ready' || running || isDone || isError) && (
           <section className="al-section al-section--reveal">
             <Eyebrow num={2}>{t('clean.section.box')}</Eyebrow>
+
+            {/* Fixed vs Moving (track) mode */}
+            <div className="al-clean__moderow">
+              <div
+                className="al-clean__toggle"
+                role="group"
+                aria-label={t('clean.mode.ariaLabel')}
+              >
+                <button
+                  type="button"
+                  className={`al-clean__togbtn${!trackMode ? ' al-clean__togbtn--active' : ''}`}
+                  aria-pressed={!trackMode}
+                  disabled={running}
+                  onClick={() => selectMode(false)}
+                >
+                  {t('clean.mode.fixed')}
+                </button>
+                <button
+                  type="button"
+                  className={`al-clean__togbtn${trackMode ? ' al-clean__togbtn--active' : ''}`}
+                  aria-pressed={trackMode}
+                  disabled={running}
+                  onClick={() => selectMode(true)}
+                >
+                  {t('clean.mode.moving')}
+                </button>
+              </div>
+              <p className="al-clean__modeexplain">
+                {trackMode ? t('clean.mode.explainMoving') : t('clean.mode.explainFixed')}
+              </p>
+            </div>
+
             <BoxCanvas
               imageUrl={frameUrl}
               width={frameSize.w}
               height={frameSize.h}
               regions={regions}
-              onChange={setRegions}
+              onChange={onRegionsChange}
             />
             <div className="al-clean__boxmeta">
               <span className="al-clean__count">
@@ -287,6 +336,11 @@ export function CleanTextFlow() {
                 </button>
               )}
             </div>
+            {trackMode && (
+              <p className="al-clean__note al-clean__note--hint" role="note">
+                {t('clean.mode.movingHint')}
+              </p>
+            )}
           </section>
         )}
 

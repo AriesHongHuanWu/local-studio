@@ -11,6 +11,21 @@
   color: var(--al-ink-faint);
   margin: 0;
 }
+.al-clean__note--hint {
+  color: var(--al-gold);
+}
+
+/* ─────────────────────────── Fixed vs Moving (track) mode ─────────────────────────── */
+.al-clean__moderow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-2);
+}
+.al-clean__modeexplain {
+  font-size: var(--al-text-sm);
+  color: var(--al-ink-faint);
+  margin: 0;
+}
 
 /* ─────────────────────────── Box canvas ─────────────────────────── */
 .al-boxcanvas {

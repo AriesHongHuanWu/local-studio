@@ -237,6 +237,11 @@ The third top-level mode. The user loads a video, draws one or more boxes over t
 
 Boxes are passed as **normalized `0..1` coordinates** relative to the frame width/height — resolution-independent, so the box drawn on the preview frame maps exactly onto the full-resolution video.
 
+**Two erase modes — fixed vs moving (`track`):**
+
+- **Fixed** (`track: false`, default) — every box is erased at the **same on-screen position** on every frame. Use for burned-in subtitles, a fixed-corner logo, a mistyped title. Any number of boxes.
+- **Moving** (`track: true`, exactly **one** box) — the user boxes the object on the **first in-range frame**; the engine tracks that box across the clip with **template matching** (OpenCV `cv2.matchTemplate`, `TM_CCOEFF_NORMED`) and erases the **tracked position** each frame. Best for a rigid (non-deforming) moving watermark / text / logo. Algorithm: the first in-range frame's box is captured as a grayscale **template** (kept for the whole clip — never updated, to avoid drift); each subsequent frame is matched inside a search window around the last known position (margin ≈ `0.6 × max(w,h)`); on a low-confidence match (score `< 0.30`, "lost lock") the previous position is reused (no jump); the box is clamped to the frame; size stays fixed. `track: true` with a box count ≠ 1 **falls back** to the fixed multi-box behavior. Defensive: a per-frame tracking error erases at the last known position — it never crashes the job.
+
 ### `POST /api/inpaint/frame`
 
 Grab one frame as a JPEG, for the box-drawing canvas. **`multipart/form-data`:**
@@ -261,6 +266,7 @@ Start a background text-removal job. **`multipart/form-data`:**
 | `engine` | string | `"lama"` (default, AI) or `"opencv"` (classic fallback). |
 | `startSec` | string/number | Optional — only inpaint frames at/after this time (seconds). |
 | `endSec` | string/number | Optional — only inpaint frames at/before this time (seconds). Both `startSec` **and** `endSec` must be sent to scope a time range; otherwise the whole clip is processed. |
+| `track` | string/bool | Optional (default `false`). `true` + **exactly one** box → **dynamic tracking**: track the box (captured on the first in-range frame) across the clip via `cv2.matchTemplate` and erase the tracked position each frame (moving watermark / text / logo). `false`, or any box count ≠ 1, → fixed-position erase (unchanged legacy behavior). See the **Text removal** intro for the algorithm. |
 
 **Response:**
 
@@ -296,7 +302,8 @@ When `status === "done"`, `meta` carries the engine result:
   "engineUsed":  "lama" | "opencv",   // which inpaint engine actually ran
   "width":       0,
   "height":      0,
-  "durationSec": 0.0
+  "durationSec": 0.0,
+  "tracked":     false       // true iff dynamic tracking actually ran (track=true AND exactly one box)
 }
 ```
 

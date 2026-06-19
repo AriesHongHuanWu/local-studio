@@ -82,6 +82,8 @@ export async function createInpaintJob(
   startSec?: number,
   endSec?: number,
   signal?: AbortSignal,
+  /** When true, track the single boxed object across the clip (moving mode). */
+  track?: boolean,
 ): Promise<CreateInpaintJobResponse> {
   const form = new FormData();
   form.append('video', file, file.name);
@@ -89,6 +91,7 @@ export async function createInpaintJob(
   form.append('engine', engine);
   if (startSec !== undefined) form.append('startSec', String(startSec));
   if (endSec !== undefined) form.append('endSec', String(endSec));
+  if (track !== undefined) form.append('track', track ? 'true' : 'false');
 
   let res: Response;
   try {
