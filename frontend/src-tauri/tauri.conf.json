@@ -50,9 +50,9 @@
       "../../backend/run.ps1": "backend/run.ps1",
       "../../backend/run.sh": "backend/run.sh",
       "../../backend/test_e2e.py": "backend/test_e2e.py",
-      "../../backend/pipeline/**/*": "backend/pipeline/",
-      "../../backend/web/*": "backend/web/",
-      "resources/python/**/*": "python/"
+      "../../backend/pipeline": "backend/pipeline",
+      "../../backend/web": "backend/web",
+      "resources/python": "python"
     },
     "icon": [
       "icons/32x32.png",
