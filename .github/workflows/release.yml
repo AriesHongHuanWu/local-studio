@@ -46,20 +46,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # macOS — split per-arch (native-size binaries, both arches covered).
-          # Produces two DMGs + two darwin-* updater keys (app.tar.gz).
-          # arm64 builds natively on macos-latest (Apple Silicon).
+          # macOS — Apple Silicon only. The macos-13 (Intel) runners are
+          # chronically queue-starved and stall the whole release for 20-40 min;
+          # dropped for reliable, fast releases. Intel-Mac support can be re-added
+          # later (re-add a macos-13 leg with --target x86_64-apple-darwin).
           - platform: "macos-latest"
             label: "(arm64)"
             args: "--target aarch64-apple-darwin --bundles app,dmg"
             rust-targets: "aarch64-apple-darwin"
-          # x86_64 builds on macos-13, which is an Intel (x86_64-native) runner.
-          # macos-latest is now Apple Silicon, so building x86_64 there is a
-          # cross-compile that yields an unvalidated .app; macos-13 avoids that.
-          - platform: "macos-13"
-            label: "(x86_64)"
-            args: "--target x86_64-apple-darwin --bundles app,dmg"
-            rust-targets: "x86_64-apple-darwin"
           # Linux — build on the OLDEST glibc/WebKitGTK we support. ubuntu-22.04
           # ships WebKitGTK 4.1 (Tauri v2's requirement); a 24.04-built AppImage
           # would NOT run on 22.04. AppImage is the Linux updater format; deb is
@@ -159,8 +153,14 @@ jobs:
       # Portable Python — bundle a python-build-standalone interpreter into the
       # installer so END USERS don't need to install Python. Staged into
       # frontend/src-tauri/resources/python/ (gitignored) and picked up by the
-      # tauri.conf.json `resources/python/**/*` glob. If this step is ever
-      # removed, the app still works — it falls back to system Python.
+      # tauri.conf.json `resources/python/**/*` glob. If skipped the app still
+      # works — it falls back to system Python.
+      #
+      # Windows + macOS bundle it. Linux does NOT: its AppImage packager
+      # (linuxdeploy) walks/analyzes every bundled file and chokes on the
+      # interpreter's ELF tree. Linux ships without it and uses system python3
+      # (present on virtually every Linux box; the first-run wizard guides the
+      # user to install it if somehow absent).
       - name: Fetch portable Python (Windows)
         if: startsWith(matrix.platform, 'windows')
         shell: pwsh
@@ -168,8 +168,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./scripts/fetch-portable-python.ps1
 
-      - name: Fetch portable Python (macOS / Linux)
-        if: ${{ !startsWith(matrix.platform, 'windows') }}
+      - name: Fetch portable Python (macOS)
+        if: startsWith(matrix.platform, 'macos')
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -266,7 +266,7 @@ jobs:
             echo "**Before it goes live, do this manually:**"
             echo ""
             echo "1. Open **Releases** → the draft **Ai Caption $tag**."
-            echo "2. Confirm \`latest.json\` has all platform keys (\`windows-x86_64\`, \`darwin-aarch64\`, \`darwin-x86_64\`, \`linux-x86_64\`), each with a non-empty \`signature\`."
+            echo "2. Confirm \`latest.json\` has all platform keys (\`windows-x86_64\`, \`darwin-aarch64\`, \`linux-x86_64\`), each with a non-empty \`signature\`."
             echo "3. **Publish** the draft (this flips it to *Latest*, so \`releases/latest/download/latest.json\` starts serving it)."
             echo ""
             if [ "${{ needs.release.result }}" != "success" ]; then
