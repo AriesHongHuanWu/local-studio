@@ -73,4 +73,56 @@ export const video: Record<string, Entry> = {
     zh: '已選用快速模型：{model}',
     en: 'Using fast model: {model}',
   },
+
+  // ── Subtitle editor (Editor tab in Video mode) ──
+  'video.editor.title': { zh: '字幕編輯', en: 'Subtitle editor' },
+  'video.editor.empty.title': { zh: '尚無字幕', en: 'No subtitles yet' },
+  'video.editor.empty.body': {
+    zh: '先在「辨識」分頁放入一段影片並產生字幕，每一句都會在這裡變成可編輯的字幕段落。',
+    en: 'Drop a video in Transcribe and generate subtitles — every cue becomes editable here.',
+  },
+  'video.editor.badge.edited': { zh: '已編輯', en: 'Edited' },
+  'video.editor.badge.demo': { zh: '示範', en: 'Demo' },
+  'video.editor.cues.title': { zh: '字幕段落', en: 'Subtitle cues' },
+  'video.editor.cues.count': { zh: '{count} 段', en: '{count} cues' },
+  'video.editor.cues.ariaLabel': { zh: '字幕段落，點擊跳轉並可編輯', en: 'Subtitle cues — click to seek, edit inline' },
+  'video.editor.hint': {
+    zh: '點段落跳轉 · 編輯文字 · ± 微調 0.1 秒',
+    en: 'Click a cue to seek · edit text · ± nudge 0.1s',
+  },
+
+  // ── Preview (audio-only fallback when no <video> track) ──
+  'video.editor.preview.audioOnly.title': { zh: '純音訊來源', en: 'Audio-only source' },
+  'video.editor.preview.audioOnly.body': {
+    zh: '此來源沒有影像；下方仍可逐句校對字幕的文字與時間。',
+    en: 'This source has no video track — you can still proofread cue text and timing below.',
+  },
+  'video.editor.preview.none.title': { zh: '沒有可預覽的來源', en: 'No source to preview' },
+  'video.editor.preview.none.body': {
+    zh: '在「辨識」分頁放入影片後，預覽會出現在這裡。',
+    en: 'Drop a file in Transcribe and the preview appears here.',
+  },
+
+  // ── Mini transport ──
+  'video.editor.transport.play': { zh: '播放', en: 'Play' },
+  'video.editor.transport.pause': { zh: '暫停', en: 'Pause' },
+  'video.editor.transport.seek': { zh: '拖動時間軸', en: 'Seek' },
+
+  // ── Cue row controls ──
+  'video.editor.cue.textAriaLabel': { zh: '字幕文字', en: 'Cue text' },
+  'video.editor.cue.textPlaceholder': { zh: '（空白字幕）', en: '(empty cue)' },
+  'video.editor.cue.seekTitle': { zh: '跳到這一句', en: 'Seek to this cue' },
+  'video.editor.cue.startLabel': { zh: '起', en: 'In' },
+  'video.editor.cue.endLabel': { zh: '迄', en: 'Out' },
+  'video.editor.cue.startMinus': { zh: '起點 −0.1 秒', en: 'Start −0.1s' },
+  'video.editor.cue.startPlus': { zh: '起點 +0.1 秒', en: 'Start +0.1s' },
+  'video.editor.cue.endMinus': { zh: '終點 −0.1 秒', en: 'End −0.1s' },
+  'video.editor.cue.endPlus': { zh: '終點 +0.1 秒', en: 'End +0.1s' },
+
+  // ── Clean-mode fallback note (Editor tab is normally hidden in clean mode) ──
+  'video.editor.clean.title': { zh: '文字移除沒有獨立編輯器', en: 'Clean Text has no separate editor' },
+  'video.editor.clean.body': {
+    zh: '文字移除是一條到底的流程 — 在「辨識」分頁框選文字、處理並下載成品影片即可。',
+    en: 'Clean Text is a single flow — box the text in Transcribe, run it, and download the finished video.',
+  },
 };

@@ -1,0 +1,429 @@
+/* ══════════════════════════════════════════════════════════════════
+   SubtitleEditor — the Editor tab in VIDEO mode.
+
+   A calm "video-editor look": framed preview + caption overlay on top,
+   a mini transport, and an editable cue list below. Same warm-graphite
+   ink-on-dark-stock palette as the lyric editor; the active cue carries
+   the single antique-gold accent.
+   ══════════════════════════════════════════════════════════════════ */
+
+.al-subedit {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+/* ── Top status bar (mirrors .al-editor__bar) ── */
+.al-subedit__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--al-space-3);
+  padding: var(--al-space-3) var(--al-gutter);
+  border-bottom: 1px solid var(--al-hairline);
+  flex-shrink: 0;
+}
+.al-subedit__bar-group {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-3);
+  min-width: 0;
+}
+.al-subedit__hint {
+  font-family: var(--al-font-mono);
+  font-size: var(--al-text-xs);
+  letter-spacing: 0.02em;
+  color: var(--al-ink-faint);
+  white-space: nowrap;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Stage — framed video preview + mini transport
+   ══════════════════════════════════════════════════════════════════ */
+.al-subedit__stage {
+  flex-shrink: 0;
+  padding: var(--al-space-4) var(--al-gutter) var(--al-space-2);
+}
+
+.al-subedit__frame {
+  position: relative;
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--al-radius-panel);
+  overflow: hidden;
+  background: #000;
+  border: 1px solid var(--al-hairline);
+  box-shadow: var(--al-shadow-panel);
+}
+.al-subedit__video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+  cursor: pointer;
+}
+
+/* Audio-only / no-source fallback inside the frame */
+.al-subedit__noVideo {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: var(--al-space-5);
+  text-align: center;
+  color: var(--al-ink-muted);
+  background: radial-gradient(
+    120% 120% at 50% 0%,
+    var(--al-surface-2) 0%,
+    var(--al-surface) 70%
+  );
+}
+.al-subedit__noVideo svg {
+  color: var(--al-ink-faint);
+  margin-bottom: 2px;
+}
+.al-subedit__noVideo-title {
+  font-family: var(--al-font-display);
+  font-size: var(--al-lyric-far);
+  color: var(--al-ink-dim);
+}
+.al-subedit__noVideo-body {
+  font-size: var(--al-text-sm);
+  color: var(--al-ink-faint);
+  max-width: 42ch;
+  line-height: 1.5;
+}
+
+/* ── Mini transport ── */
+.al-subedit__transport {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-3);
+  max-width: 760px;
+  margin: var(--al-space-3) auto 0;
+}
+.al-subedit__seek {
+  flex: 1;
+  min-width: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--al-surface-2);
+  outline: none;
+  cursor: pointer;
+}
+.al-subedit__seek::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--al-gold);
+  box-shadow: 0 0 8px var(--al-gold-glow);
+  border: none;
+  cursor: pointer;
+}
+.al-subedit__seek::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--al-gold);
+  box-shadow: 0 0 8px var(--al-gold-glow);
+  border: none;
+  cursor: pointer;
+}
+.al-subedit__seek:focus-visible {
+  box-shadow: 0 0 0 2px var(--al-gold-glow);
+}
+.al-subedit__clock {
+  font-family: var(--al-font-mono);
+  font-size: var(--al-text-sm);
+  color: var(--al-ink-dim);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.al-subedit__clock-sep {
+  color: var(--al-ink-faint);
+  margin: 0 4px;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Cue list — editable rows; the playhead cue glows gold
+   ══════════════════════════════════════════════════════════════════ */
+.al-subedit__cues {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--al-hairline);
+  margin-top: var(--al-space-2);
+}
+.al-subedit__cues-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--al-space-3) var(--al-gutter);
+  flex-shrink: 0;
+}
+.al-subedit__cues-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--al-font-mono);
+  font-size: var(--al-text-xs);
+  letter-spacing: var(--al-tracking-caps);
+  text-transform: uppercase;
+  color: var(--al-ink-muted);
+}
+.al-subedit__cues-title svg {
+  color: var(--al-gold);
+}
+.al-subedit__cues-count {
+  font-family: var(--al-font-mono);
+  font-size: var(--al-text-xs);
+  color: var(--al-ink-faint);
+}
+.al-subedit__cues-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 var(--al-gutter) var(--al-space-5);
+}
+.al-subedit__cues-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-width: 760px;
+  margin-inline: auto;
+}
+.al-subedit__cues-rows > li {
+  margin-bottom: var(--al-space-2);
+}
+
+/* ── A cue row ── */
+.al-cuerow {
+  display: flex;
+  gap: var(--al-space-3);
+  padding: var(--al-space-3);
+  border: 1px solid var(--al-hairline);
+  border-radius: var(--al-radius-panel);
+  background: var(--al-surface);
+  transition:
+    background var(--al-dur-snap) var(--al-ease-snap),
+    border-color var(--al-dur-snap) var(--al-ease-snap),
+    box-shadow var(--al-dur-snap) var(--al-ease-snap);
+}
+.al-cuerow:hover {
+  border-color: var(--al-hairline-strong);
+}
+.al-cuerow--active {
+  background: var(--al-gold-glow);
+  border-color: color-mix(in srgb, var(--al-gold) 40%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--al-gold) 22%, transparent);
+}
+
+/* click-to-seek marker */
+.al-cuerow__seek {
+  flex-shrink: 0;
+  width: 18px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 8px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+.al-cuerow__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--al-ink-decor);
+  transition:
+    background var(--al-dur-snap) var(--al-ease-snap),
+    box-shadow var(--al-dur-snap) var(--al-ease-snap);
+}
+.al-cuerow__seek:hover .al-cuerow__dot {
+  background: var(--al-gold-soft);
+}
+.al-cuerow--active .al-cuerow__dot {
+  background: var(--al-gold);
+  box-shadow: 0 0 8px var(--al-gold-glow);
+}
+
+.al-cuerow__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-2);
+}
+
+/* editable cue text */
+.al-cuerow__text {
+  width: 100%;
+  resize: vertical;
+  min-height: 2.2em;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--al-radius-ctrl);
+  background: var(--al-surface-2);
+  color: var(--al-ink-dim);
+  font-family: var(--al-font-display);
+  font-size: var(--al-text-lg);
+  line-height: 1.4;
+  transition:
+    border-color var(--al-dur-snap) var(--al-ease-snap),
+    color var(--al-dur-snap) var(--al-ease-snap);
+}
+.al-cuerow__text::placeholder {
+  color: var(--al-ink-faint);
+  font-style: italic;
+}
+.al-cuerow__text:hover {
+  border-color: var(--al-hairline-strong);
+}
+.al-cuerow__text:focus {
+  outline: none;
+  border-color: var(--al-gold);
+  color: var(--al-ink);
+  box-shadow: 0 0 0 2px var(--al-gold-glow);
+}
+.al-cuerow--active .al-cuerow__text {
+  color: var(--al-ink);
+}
+
+/* ── In / out timing controls ── */
+.al-cuerow__times {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-2);
+  flex-wrap: wrap;
+}
+.al-cuerow__arrow {
+  color: var(--al-ink-faint);
+  font-family: var(--al-font-mono);
+  font-size: var(--al-text-sm);
+}
+
+.al-timefield {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 5px;
+  border-radius: var(--al-radius-ctrl);
+  background: var(--al-surface-2);
+  border: 1px solid var(--al-hairline);
+}
+.al-timefield__label {
+  font-family: var(--al-font-mono);
+  font-size: var(--al-text-xs);
+  letter-spacing: var(--al-tracking-caps);
+  text-transform: uppercase;
+  color: var(--al-ink-faint);
+  padding: 0 2px;
+}
+.al-timefield__val {
+  font-family: var(--al-font-mono);
+  font-size: var(--al-text-sm);
+  color: var(--al-ink-dim);
+  font-variant-numeric: tabular-nums;
+  min-width: 8ch;
+  text-align: center;
+}
+.al-cuerow--active .al-timefield__val {
+  color: var(--al-gold-soft);
+}
+.al-timefield__nudge {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--al-radius-chip);
+  border: 1px solid var(--al-hairline-strong);
+  background: var(--al-surface);
+  color: var(--al-ink-dim);
+  font-family: var(--al-font-mono);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background var(--al-dur-snap) var(--al-ease-snap),
+    color var(--al-dur-snap) var(--al-ease-snap),
+    border-color var(--al-dur-snap) var(--al-ease-snap);
+}
+.al-timefield__nudge:hover {
+  background: var(--al-gold-glow);
+  border-color: color-mix(in srgb, var(--al-gold) 45%, transparent);
+  color: var(--al-gold-soft);
+}
+.al-timefield__nudge:focus-visible {
+  outline: 1px solid var(--al-gold);
+  outline-offset: 1px;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Empty + clean-fallback states
+   ══════════════════════════════════════════════════════════════════ */
+.al-subedit__empty,
+.al-subedit__clean {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--al-space-3);
+  text-align: center;
+  color: var(--al-ink-muted);
+  padding: var(--al-gutter);
+}
+.al-subedit__empty svg,
+.al-subedit__clean svg {
+  color: var(--al-ink-faint);
+}
+.al-subedit__empty-title,
+.al-subedit__clean-title {
+  font-family: var(--al-font-display);
+  font-size: var(--al-lyric-near);
+  color: var(--al-ink-dim);
+}
+.al-subedit__clean-body {
+  max-width: 46ch;
+  font-size: var(--al-text-md);
+  line-height: 1.55;
+  color: var(--al-ink-faint);
+}
+
+/* ── Narrow window: tighten gutters so the column still breathes ── */
+@media (max-width: 900px) {
+  .al-subedit__bar,
+  .al-subedit__stage,
+  .al-subedit__cues-head,
+  .al-subedit__cues-scroll {
+    padding-left: var(--al-space-5);
+    padding-right: var(--al-space-5);
+  }
+  .al-subedit__hint {
+    display: none;
+  }
+}
+
+/* ── Reduced motion: drop the auto-scroll smoothing handled in JS only ── */
+@media (prefers-reduced-motion: reduce) {
+  .al-cuerow,
+  .al-cuerow__text,
+  .al-timefield__nudge,
+  .al-cuerow__dot {
+    transition: none;
+  }
+}

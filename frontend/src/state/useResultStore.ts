@@ -35,6 +35,10 @@ interface ResultState {
   confirmWord: (ref: WordRef) => void;
   /** Edit a whole line's text. */
   editSegmentText: (segId: number, text: string) => void;
+  /** Set a segment (subtitle cue) start; clamps ≥0 and keeps start ≤ end. */
+  setSegmentStart: (segId: number, start: number) => void;
+  /** Set a segment (subtitle cue) end; keeps end ≥ start. */
+  setSegmentEnd: (segId: number, end: number) => void;
 }
 
 function findSeg(result: Result, segId: number): Segment | undefined {
@@ -142,6 +146,28 @@ export const useResultStore = create<ResultState>((set, get) => ({
     const seg = findSeg(next, segId);
     if (!seg) return;
     seg.text = text;
+    set({ result: next, dirty: true });
+  },
+
+  setSegmentStart: (segId, start) => {
+    const cur = get().result;
+    if (!cur) return;
+    const next = cloneResult(cur);
+    const seg = findSeg(next, segId);
+    if (!seg) return;
+    // clamp ≥0, keep start ≤ end (min 10 ms cue so it never inverts/collapses)
+    seg.start = Math.max(0, Math.min(start, seg.end - 0.01));
+    set({ result: next, dirty: true });
+  },
+
+  setSegmentEnd: (segId, end) => {
+    const cur = get().result;
+    if (!cur) return;
+    const next = cloneResult(cur);
+    const seg = findSeg(next, segId);
+    if (!seg) return;
+    // keep end ≥ start (min 10 ms cue)
+    seg.end = Math.max(seg.start + 0.01, end);
     set({ result: next, dirty: true });
   },
 }));

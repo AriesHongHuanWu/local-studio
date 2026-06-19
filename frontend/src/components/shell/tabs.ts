@@ -7,6 +7,7 @@ import {
   Library,
   SlidersHorizontal,
 } from 'lucide-react';
+import type { AppMode } from '../../state/useMode';
 
 export type TabKey = 'transcribe' | 'editor' | 'export' | 'library' | 'settings';
 
@@ -24,3 +25,26 @@ export const TABS: TabDef[] = [
   { key: 'library', labelKey: 'common.nav.library', icon: Library },
   { key: 'settings', labelKey: 'common.nav.settings', icon: SlidersHorizontal },
 ];
+
+/* ──────────────────────────────────────────────────────────────────
+   Per-mode tab visibility. The TABS array above stays the single source
+   of label/icon metadata; this just decides WHICH keys each product mode
+   surfaces (and in what order).
+
+     • song  → the full lyric workflow: 辨識 / 編輯 / 匯出 / 紀錄 / 設定.
+     • video → same five tabs, but the Editor + Export are subtitle-shaped
+               (Agent B reskins the Editor; Export already defaults to SRT).
+     • clean → a focused video-out flow: the CleanTextFlow lives in 辨識,
+               and 設定 stays reachable. 編輯/匯出/紀錄 are lyric-oriented
+               and irrelevant to a clean job, so they're hidden.
+   ────────────────────────────────────────────────────────────────── */
+const TABS_BY_MODE: Record<AppMode, TabKey[]> = {
+  song: ['transcribe', 'editor', 'export', 'library', 'settings'],
+  video: ['transcribe', 'editor', 'export', 'library', 'settings'],
+  clean: ['transcribe', 'settings'],
+};
+
+/** The ordered TabKeys a given product mode should show in the rail/router. */
+export function tabsForMode(mode: AppMode): TabKey[] {
+  return TABS_BY_MODE[mode];
+}

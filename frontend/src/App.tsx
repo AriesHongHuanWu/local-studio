@@ -3,12 +3,14 @@ import { AppFrame } from './components/shell/AppFrame';
 import { TabRail } from './components/shell/TabRail';
 import { StatusStrip } from './components/shell/StatusStrip';
 import type { TabKey } from './components/shell/tabs';
+import { tabsForMode } from './components/shell/tabs';
 import { TranscribeTab } from './tabs/transcribe/TranscribeTab';
 import { EditorTab } from './tabs/editor/EditorTab';
 import { ExportTab } from './tabs/export/ExportTab';
 import { LibraryTab } from './tabs/library/LibraryTab';
 import { SettingsTab } from './tabs/settings/SettingsTab';
 import { useMeta } from './state/useMeta';
+import { useMode } from './state/useMode';
 import { useJob } from './state/useJob';
 import { useLibrary } from './state/useLibrary';
 import { useModels } from './state/useModels';
@@ -29,6 +31,15 @@ const COLLAPSE_WIDTH = 900;
 export default function App() {
   const [tab, setTab] = useState<TabKey>('transcribe');
   const [collapsed, setCollapsed] = useState(false);
+
+  // Each product mode surfaces only a subset of the 5 tabs (tabsForMode). If
+  // the mode changes while we're on a tab it no longer shows — e.g. switching
+  // to Clean-Text while sitting on the lyric Editor — snap back to its flow
+  // (辨識) instead of leaving the router pointed at a hidden/irrelevant tab.
+  const mode = useMode((s) => s.mode);
+  useEffect(() => {
+    if (!tabsForMode(mode).includes(tab)) setTab('transcribe');
+  }, [mode, tab]);
 
   // First-run setup gate — only active inside Tauri when venv is absent.
   const inTauri = useSetup((s) => s.inTauri);

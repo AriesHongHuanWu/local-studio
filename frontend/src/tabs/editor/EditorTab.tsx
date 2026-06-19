@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Eye, EyeOff, TextCursorInput, Sparkles } from 'lucide-react';
+import { Eye, EyeOff, TextCursorInput, Sparkles, Eraser } from 'lucide-react';
 import './editor.css';
 import { Badge, HairlineRule, Pill, Popover } from '../../components/primitives';
 import { LyricDocument } from './LyricDocument';
 import { Transport } from './Transport';
 import { WordInspector } from './WordInspector';
+import { SubtitleEditor } from './SubtitleEditor';
 import { DEMO_RESULT } from './demoResult';
 import { useAudio } from '../../state/useAudio';
 import { useJob } from '../../state/useJob';
+import { useMode } from '../../state/useMode';
 import { useResultStore } from '../../state/useResultStore';
 import { decodePeaks } from '../../lib/waveform';
 import type { PeakData } from '../../lib/waveform';
@@ -37,7 +39,38 @@ function usePrefersReducedMotion(): boolean {
   return reduced;
 }
 
+/* ──────────────────────────────────────────────────────────────────
+   EditorTab — mode-aware Editor surface.
+
+   • song  → the lyric document below (unchanged).
+   • video → a video-editor-style subtitle editor (preview + cue list).
+   • clean → friendly fallback note (Agent A normally HIDES this tab in
+             clean mode; this only shows if it's ever routed here).
+   ────────────────────────────────────────────────────────────────── */
 export function EditorTab() {
+  const mode = useMode((s) => s.mode);
+
+  if (mode === 'video') return <SubtitleEditor />;
+  if (mode === 'clean') return <CleanEditorNote />;
+  return <LyricEditor />;
+}
+
+/** Clean-mode fallback (the focused clean flow lives in the Transcribe tab). */
+function CleanEditorNote() {
+  const t = useT();
+  return (
+    <div className="al-subedit">
+      <div className="al-subedit__clean">
+        <Eraser size={30} strokeWidth={1.25} />
+        <div className="al-subedit__clean-title">{t('video.editor.clean.title')}</div>
+        <div className="al-subedit__clean-body">{t('video.editor.clean.body')}</div>
+      </div>
+    </div>
+  );
+}
+
+/** The original lyric document editor — unchanged behaviour for song mode. */
+function LyricEditor() {
   const t = useT();
   const result = useResultStore((s) => s.result);
   const dirty = useResultStore((s) => s.dirty);
