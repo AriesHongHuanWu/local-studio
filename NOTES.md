@@ -1,20 +1,16 @@
-# Ai Caption v0.1.7
+# Ai Caption v0.1.8
 
-🔥 The big one — **burn word-by-word captions straight into your video** and export a ready-to-post MP4.
+Stability fixes — no more crashes when GPU memory is tight, and the backend now heals itself.
 
-### New
-- **🔥 動態字幕燒錄 / Burn captions into video** — in 影片字幕 mode, once a video is transcribed, a new panel lets you bake the **word-level captions** right into the picture and download a finished MP4 (original audio kept). Three styles:
-  - **乾淨 (Clean)** — white text + outline, the word being spoken turns gold.
-  - **卡拉OK (Karaoke)** — already-said words white, current word gold, upcoming words gray. Classic word-by-word fill.
-  - **社群粗體 (Bold)** — the current word sits in a gold highlight block (TikTok / Reels look).
-- Because the highlight is driven by Ai Caption's **word-level timing**, the colour lands on the exact word as it's said/sung — the same thing paid tools charge a monthly fee for, done **100% locally and free**.
-- Renders with the bundled video encoder (NVIDIA / Intel / CPU), finds your system CJK font automatically, and keeps the original audio untouched.
+### Fixed
+- **🧠 顯存不足 / Clean Text errors on a busy GPU** — if another app (e.g. DaVinci Resolve, a game) is using your graphics memory, Clean Text used to fail with out-of-memory. Now Ai Caption **checks free VRAM and automatically runs LaMa on the CPU when the GPU is tight** (slower, but it finishes instead of erroring), and it **survives an out-of-memory mid-render** by switching to CPU on the fly. It also frees GPU memory after each job.
+- **🔌 "Cannot reach local backend"** — added a **watchdog that automatically restarts the engine** if it ever crashes or gets killed, so the app recovers on its own instead of going permanently offline. (It stops cleanly when you quit, so no leftover processes.)
 
-### Tip
-- For lyric videos, run **精準模式** (or **強制對齊** with full lyrics) first for the tightest word timing, then burn — the captions will snap perfectly to the beat.
+### Tip if your GPU is small (≤ 8 GB)
+- Closing other GPU-heavy apps (video editors, games) while running Ai Caption frees the most memory and keeps everything on the fast GPU path.
 
 ### Unchanged
-- 100% local — nothing is uploaded. Runs on no-GPU laptops (CPU int8 / Intel Core Ultra).
+- 100% local — nothing is uploaded. All v0.1.7 features (動態字幕燒錄, 精準模式, 選硬碟…) as before.
 
 If you'd like to support development: ☕ [Ko-fi](https://ko-fi.com/arieswu) · [PayPal](https://paypal.me/Arieshonghuan) · [GitHub Sponsors](https://github.com/sponsors/AriesHongHuanWu).
 

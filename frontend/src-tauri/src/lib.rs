@@ -57,6 +57,9 @@ struct BackendProcess {
     /// 安裝/啟動序列化旗標 —— 防止 `setup_backend` 與 `restart_backend` (或 setup
     /// hook) 並行 spawn 兩個 uvicorn 搶同一個 8756 埠。為 `true` 時第二個呼叫直接放棄。
     setup_in_progress: AtomicBool,
+    /// App 結束中旗標 —— watchdog 看到此旗標為 true 就不再自動重啟後端
+    /// (否則 Exit→kill 之後 watchdog 又把它拉起來,變成關不掉的孤兒)。
+    shutting_down: AtomicBool,
     /// Windows Job Object handle;保持存活以維持 KILL_ON_JOB_CLOSE 語意。
     #[cfg(windows)]
     _job: Mutex<Option<windows::JobHandle>>,
@@ -144,6 +147,16 @@ impl BackendProcess {
                 }
             }
         }
+    }
+
+    /// 標記 App 結束中 —— 讓 watchdog 停止自動重啟(配合 Exit 時的 kill)。
+    fn begin_shutdown(&self) {
+        self.shutting_down.store(true, Ordering::Release);
+    }
+
+    /// watchdog 用:App 是否正在結束。
+    fn is_shutting_down(&self) -> bool {
+        self.shutting_down.load(Ordering::Acquire)
     }
 }
 
@@ -513,6 +526,24 @@ fn try_spawn_backend(app: &AppHandle) -> Option<SpawnedBackend> {
     }
     let env = cache_env(app);
     spawn_backend_at(&backend_dir, &env)
+}
+
+/// 後端看門狗:每隔數秒探測 8756 埠;若後端不在(崩潰 / 被 OOM 殺掉 / 意外結束)且
+/// App 未在結束流程中,就走 guarded 路徑自動重啟 —— 讓「Cannot reach backend」能自我
+/// 復原,使用者不必手動重開 App。`guarded_spawn_install` 內部已序列化 + 防搶埠,故與
+/// setup/restart 並行也安全;venv 尚未安裝時 spawn 會優雅 no-op(等安裝精靈跑完)。
+fn spawn_backend_watchdog(app: AppHandle) {
+    std::thread::spawn(move || loop {
+        std::thread::sleep(Duration::from_secs(8));
+        let state = app.state::<BackendProcess>();
+        if state.is_shutting_down() {
+            break;
+        }
+        if !backend_already_listening() {
+            log::warn!("watchdog:後端未在 8756 埠回應 —— 嘗試自動重啟。");
+            state.guarded_spawn_install(&app);
+        }
+    });
 }
 
 // ============================================================================
@@ -1159,6 +1190,8 @@ pub fn run() {
             // 走 guarded 路徑:與日後 setup_backend/restart_backend 並行時不會雙重 spawn。
             let handle = app.handle().clone();
             app.state::<BackendProcess>().guarded_spawn_install(&handle);
+            // 看門狗:後端崩潰 / 被 OOM 殺掉時自動重啟,讓「Cannot reach backend」自我復原。
+            spawn_backend_watchdog(app.handle().clone());
             Ok(())
         })
         .build(tauri::generate_context!())
@@ -1167,6 +1200,8 @@ pub fn run() {
             // 視窗關閉 / App 結束時,可靠地收掉後端子行程,避免孤兒 uvicorn。
             match event {
                 RunEvent::ExitRequested { .. } | RunEvent::Exit => {
+                    // 先標記結束,讓 watchdog 不要再把後端拉起來,再 kill。
+                    app_handle.state::<BackendProcess>().begin_shutdown();
                     app_handle.state::<BackendProcess>().kill();
                 }
                 _ => {}

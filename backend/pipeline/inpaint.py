@@ -79,6 +79,42 @@ def _resolve_device(device: str) -> str:
     return dev
 
 
+# LaMa 在 GPU 推論大約需要 ~1.5GB(視解析度而定)。可用 VRAM 低於此門檻時,LaMa
+# 改走 CPU —— 慢一點但不會 OOM。常見於 8GB 顯卡又同時開了 DaVinci/遊戲等吃顯存的程式。
+_LAMA_MIN_FREE_MB = 1800.0
+
+
+def _cuda_free_mb() -> Optional[float]:
+    """目前 CUDA 裝置可用 VRAM(MB);torch/CUDA 缺席或查詢失敗回 None。"""
+    try:
+        import torch  # type: ignore
+
+        if not torch.cuda.is_available():
+            return None
+        free, _total = torch.cuda.mem_get_info()
+        return float(free) / (1024.0 * 1024.0)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _empty_cuda_cache() -> None:
+    """釋放 torch 的 CUDA 快取配置塊(讓給其他程式/騰出空間),失敗無聲略過。"""
+    try:
+        import torch  # type: ignore
+
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _is_oom(exc: BaseException) -> bool:
+    """粗略判斷例外是否為 CUDA / GPU 記憶體不足。"""
+    text = f"{type(exc).__name__}: {exc}".lower()
+    needles = ("out of memory", "outofmemory", "cuda", "cublas", "cudnn", "alloc")
+    return any(n in text for n in needles)
+
+
 # --------------------------------------------------------------------------- #
 # LaMa 載入 + 單張修補
 # --------------------------------------------------------------------------- #
@@ -299,9 +335,26 @@ def remove_text(
 
     dev = _resolve_device(device)
     use_lama = engine != "opencv"
-    lama = _load_lama(dev) if use_lama else None
+    # VRAM 守門:先清快取再看可用顯存;太少就讓 LaMa 走 CPU,避免 OOM
+    # (其餘影片編碼仍可用 GPU 的 nvenc/qsv)。
+    lama_dev = dev
+    if use_lama and dev == "cuda":
+        _empty_cuda_cache()
+        free_mb = _cuda_free_mb()
+        if free_mb is not None and free_mb < _LAMA_MIN_FREE_MB:
+            logger.warning(
+                "可用 VRAM 僅 %.0fMB(< %.0fMB)→ LaMa 改用 CPU 以避免 OOM", free_mb, _LAMA_MIN_FREE_MB
+            )
+            lama_dev = "cpu"
+    lama = _load_lama(lama_dev) if use_lama else None
     engine_used = "lama" if lama is not None else "opencv"
-    _emit(progress, 1.0, f"準備 inpaint(引擎={engine_used} device={dev})")
+    _emit(
+        progress,
+        1.0,
+        f"準備 inpaint(引擎={engine_used} device={dev}"
+        + (f" · LaMa={lama_dev}" if lama is not None and lama_dev != dev else "")
+        + ")",
+    )
 
     in_c = av.open(video_path)  # type: ignore[union-attr]
     try:
@@ -380,16 +433,35 @@ def remove_text(
                             except Exception:  # noqa: BLE001 - 追蹤出錯沿用上一框,絕不崩潰
                                 logger.debug("追蹤幀處理出錯,沿用上一框", exc_info=True)
                                 box = (tracker.x, tracker.y, tracker.tw, tracker.th)
-                            if lama is not None:
-                                img = _inpaint_region_lama(lama, img, box, pad)
-                            else:
-                                img = _inpaint_region_cv2(img, box, pad)
-                        else:
-                            for box in boxes_px:
+                            try:
                                 if lama is not None:
                                     img = _inpaint_region_lama(lama, img, box, pad)
                                 else:
                                     img = _inpaint_region_cv2(img, box, pad)
+                            except Exception as exc:  # noqa: BLE001
+                                if lama is not None and _is_oom(exc):
+                                    logger.warning("LaMa GPU OOM(第 %d 幀)→ 切換 CPU 續跑", done)
+                                    _empty_cuda_cache()
+                                    lama = _load_lama("cpu")
+                                    engine_used = "lama" if lama is not None else "opencv"
+                                    # 這一幀照原樣輸出,下一幀起用 CPU(不重跑追蹤,避免狀態錯亂)。
+                                else:
+                                    raise
+                        else:
+                            try:
+                                for box in boxes_px:
+                                    if lama is not None:
+                                        img = _inpaint_region_lama(lama, img, box, pad)
+                                    else:
+                                        img = _inpaint_region_cv2(img, box, pad)
+                            except Exception as exc:  # noqa: BLE001
+                                if lama is not None and _is_oom(exc):
+                                    logger.warning("LaMa GPU OOM(第 %d 幀)→ 切換 CPU 續跑", done)
+                                    _empty_cuda_cache()
+                                    lama = _load_lama("cpu")
+                                    engine_used = "lama" if lama is not None else "opencv"
+                                else:
+                                    raise
                     nf = av.VideoFrame.from_ndarray(img, format="rgb24")  # type: ignore[union-attr]
                     for p in out_v.encode(nf):
                         out_c.mux(p)
@@ -408,6 +480,7 @@ def remove_text(
             out_c.mux(p)
         out_c.close()
 
+        _empty_cuda_cache()  # 跑完釋放 VRAM,讓給後續辨識/其他程式
         _emit(progress, 100.0, f"完成 · 共 {done} 幀")
         dur = (float(in_v.duration) * vbase) if (in_v.duration and vbase) else (done / float(rate) if rate else 0.0)
         return {
@@ -415,6 +488,7 @@ def remove_text(
             "frames": done,
             "encoder": encoder,
             "engineUsed": engine_used,
+            "lamaDevice": lama_dev,
             "width": W,
             "height": H,
             "durationSec": round(dur, 3),
