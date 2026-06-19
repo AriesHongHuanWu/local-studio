@@ -1,19 +1,12 @@
-# Ai Caption v0.1.9
+# Ai Caption v0.1.10
 
-Accuracy upgrade — better words *and* tighter timing, with captions/karaoke that snap to the beat.
+Small fix: the version number shown in Settings is now correct.
 
-### Improved
-- **🎯 Precision mode is now stronger** (the 精準模式 toggle):
-  - **Cleaner vocal separation** — on GPU with enough memory, Demucs runs with test-time augmentation, giving Whisper a cleaner vocal track to read → fewer wrong words. (VRAM-aware: skipped automatically when the GPU is tight, so it won't cause out-of-memory.)
-  - **Tighter word timing** — word starts are snapped to the actual vocal onsets on the recognition path too (forced-align already did this), so dynamic captions and karaoke land right on the beat.
-- **⏱️ Steadier per-word timing everywhere** — word timestamps are now cleaned up in **every mode**: no overlaps, no out-of-order or zero-length words, each word gets a sensible minimum length. This makes the **動態字幕燒錄** highlight stop flickering and track the words precisely.
-
-### Notes
-- Forced-align timing is left exactly as-is (it's already accurate) — the cleanup only repairs broken cases.
-- Precision off = unchanged behaviour, just with the universal timing cleanup applied.
+### Fixed
+- **🔢 Correct version in Settings** — the "目前版本 / Current version" under **應用程式更新** (and the version in **本機保證**) was showing a stale placeholder (`0.1.0-local`) instead of the actually-installed version. It now reads the real app version, so "已是最新版本" and the version number agree. (The update check itself was always correct — only the displayed number was wrong.)
 
 ### Unchanged
-- 100% local — nothing is uploaded. All v0.1.8 stability + features as before.
+- 100% local. All v0.1.9 accuracy + features as before.
 
 If you'd like to support development: ☕ [Ko-fi](https://ko-fi.com/arieswu) · [PayPal](https://paypal.me/Arieshonghuan) · [GitHub Sponsors](https://github.com/sponsors/AriesHongHuanWu).
 

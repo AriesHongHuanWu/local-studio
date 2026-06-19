@@ -10,7 +10,7 @@
 
 import { RefreshCw, CheckCircle2, ArrowUpCircle, AlertTriangle, Loader } from 'lucide-react';
 import { useUpdater } from '../../state/useUpdater';
-import { useMeta } from '../../state/useMeta';
+import { useAppVersion } from '../../state/useAppVersion';
 import { Button } from '../primitives';
 import { useT } from '../../i18n';
 import './update.css';
@@ -20,7 +20,7 @@ const IN_TAURI = '__TAURI_INTERNALS__' in window;
 export function UpdateSettingsRow() {
   const t = useT();
   const { status, version: remoteVersion, progress, checkNow, downloadAndInstall } = useUpdater();
-  const currentVersion = useMeta((s) => s.meta.version);
+  const currentVersion = useAppVersion();
 
   if (!IN_TAURI) return null;
 

@@ -15,6 +15,7 @@ import { useMeta } from '../../state/useMeta';
 import { useModels } from '../../state/useModels';
 import { useSettings } from '../../state/useSettings';
 import { useDataRoot } from '../../state/useDataRoot';
+import { useAppVersion } from '../../state/useAppVersion';
 import type { Device, Engine } from '../../api/types';
 import { useT } from '../../i18n';
 import { UpdateSettingsRow } from '../../components/update/UpdateSettingsRow';
@@ -29,6 +30,7 @@ export function SettingsTab() {
   // Real on-disk data root (desktop). null in browser / before first load.
   const dataInfo = useDataRoot((s) => s.info);
   const dataPath = dataInfo?.effective ?? '~/.local · %LOCALAPPDATA%';
+  const appVersion = useAppVersion();
 
   // Derive install state from the real useModels store for the size picker.
   const modelInfos = useModels((s) => s.models);
@@ -179,7 +181,7 @@ export function SettingsTab() {
               <div className="al-assurance__path">
                 <dt>{t('settings.pathVersion')}</dt>
                 <dd>
-                  <code>{meta.version}</code>
+                  <code>{appVersion ?? meta.version}</code>
                 </dd>
               </div>
             </dl>
