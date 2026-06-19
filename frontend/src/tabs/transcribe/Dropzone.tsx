@@ -33,7 +33,9 @@ function prettyBytes(n: number): string {
 /** Whether a dropped file is accepted for the given mode. */
 function isAccepted(f: File, mode: AppMode): boolean {
   const ext = f.name.split('.').pop()?.toLowerCase() ?? '';
-  if (mode === 'video') {
+  // video + clean both take video containers (clean also tolerates a bare audio
+  // file, harmless — the inpaint backend simply has no region to draw on).
+  if (mode === 'video' || mode === 'clean') {
     if (f.type.startsWith('video/') || f.type.startsWith('audio/')) return true;
     return VIDEO_EXT.includes(ext);
   }
@@ -63,14 +65,18 @@ export function Dropzone({ file, durationSec, onFile, onClear, mode = 'song' }: 
   const [over, setOver] = useState(false);
   const [rejected, setRejected] = useState(false);
 
-  const isVideo = mode === 'video';
+  const isClean = mode === 'clean';
+  // "video-like" → accepts video containers + shows the film icon (video + clean).
+  const isVideo = mode === 'video' || isClean;
   const acceptAttr = isVideo ? VIDEO_ACCEPT : AUDIO_ACCEPT;
-  // mode-aware copy keys (video.* in video mode, transcribe.* in song mode)
+  // mode-aware copy keys: clean.* in clean mode, video.* in video mode,
+  // transcribe.* in song mode.
+  const ns = isClean ? 'clean' : mode === 'video' ? 'video' : 'transcribe';
   const k = {
-    aria: isVideo ? 'video.drop.ariaLabel' : 'transcribe.drop.ariaLabel',
-    lead: isVideo ? 'video.drop.lead' : 'transcribe.drop.lead',
-    sub: isVideo ? 'video.drop.sub' : 'transcribe.drop.sub',
-    reject: isVideo ? 'video.drop.reject' : 'transcribe.drop.reject',
+    aria: `${ns}.drop.ariaLabel`,
+    lead: `${ns}.drop.lead`,
+    sub: `${ns}.drop.sub`,
+    reject: `${ns}.drop.reject`,
   };
 
   const pick = () => inputRef.current?.click();

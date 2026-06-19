@@ -32,7 +32,7 @@ from typing import Any, Optional
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -83,6 +83,27 @@ except Exception as _e:  # pragma: no cover
 
     def to_json(*_a: Any, **_k: Any) -> str:  # type: ignore[misc]
         raise ImportError(f"pipeline.to_json 不可用:{_pipeline_err!r}")
+
+
+# 影片文字 / 區域移除 (AI inpainting) 子模組 —— 防禦式載入。
+# inpaint 的重相依 (av / numpy / torch / simple_lama / cv2) 缺席時整個模組仍可
+# 匯入 (is_available() 回 False),這裡再以 try/except 包一層:真的連匯入都失敗時
+# inpaint=None,對應端點回 503 / avail=false,而非讓伺服器啟動崩潰。
+try:
+    from pipeline import inpaint as inpaint  # type: ignore[no-redef]
+except Exception as _e:  # pragma: no cover
+    logger.error("無法載入 pipeline.inpaint:%r — 文字移除功能停用,其餘 API 正常。", _e)
+    inpaint = None  # type: ignore[assignment]
+
+
+def _inpaint_available() -> bool:
+    """影片文字移除是否可用 (模組載入成功且其 is_available() 為真)。"""
+    if inpaint is None:
+        return False
+    try:
+        return bool(inpaint.is_available())
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def _gpu_available() -> bool:
@@ -391,6 +412,17 @@ def _safe_upload_suffix(filename: Optional[str]) -> str:
 # 下載作業 in-memory 登記表  job_id -> dict
 MODEL_JOBS: dict[str, dict] = {}
 _MODEL_JOBS_LOCK = threading.Lock()
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 文字移除 (inpaint) 作業 in-memory 登記表
+# INPAINT_JOBS[id] = {
+#   "status": "queued"|"running"|"done"|"error",
+#   "pct": float, "message": str, "error": str|None, "meta": dict|None,
+#   "_video_path": str,   # 內部:暫存來源影片,跑完清掉
+#   "_out_path": str,     # 內部:輸出 mp4,result 端點下載用
+# }
+INPAINT_JOBS: dict[str, dict[str, Any]] = {}
+_INPAINT_JOBS_LOCK = threading.Lock()
 
 
 def _gpu_vram_total_mb() -> Optional[int]:
@@ -774,6 +806,7 @@ def api_meta() -> JSONResponse:
             "gpu": _gpu_available(),
             "demucs": _demucs_available(),
             "aligner": _aligner_available(),
+            "inpaint": _inpaint_available(),
             "installedWhisper": _installed_whisper_sizes(),
             "version": VERSION,
         }
@@ -1069,6 +1102,263 @@ def api_delete_model(model_id: str) -> JSONResponse:
         raise HTTPException(status_code=500, detail=f"刪除模型失敗:{exc}") from exc
 
     return JSONResponse({"ok": True, "freedMB": round(float(result.get("freedMB", 0.0)), 1)})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 文字移除 (inpaint) 端點群 —— 「文字移除 / Clean Text」模式
+# 使用者框出燒錯的文字 (固定位置),AI inpainting (LaMa) 逐幀抹除該區域,
+# 輸出保留原音軌的新 mp4。重相依缺席時整組端點回 503 / avail=false,絕不崩潰。
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _require_inpaint() -> None:
+    """inpaint 不可用時丟 503,讓相依缺席優雅降級而非 500/崩潰。"""
+    if not _inpaint_available():
+        raise HTTPException(
+            status_code=503,
+            detail="文字移除功能不可用 (缺 PyAV/numpy)。請重新執行安裝以取得相依套件。",
+        )
+
+
+def _make_inpaint_progress(job_id: str):
+    """產生 progress(stage, pct, msg) 回呼,就地更新 INPAINT_JOBS[job_id]。"""
+
+    def progress(stage: str, pct: float, message: str = "") -> None:
+        with _INPAINT_JOBS_LOCK:
+            job = INPAINT_JOBS.get(job_id)
+            if job is None:
+                return
+            if job["status"] in ("queued", "running"):
+                job["status"] = "running"
+            try:
+                job["pct"] = max(0.0, min(100.0, float(pct)))
+            except (TypeError, ValueError):
+                pass
+            if message:
+                job["message"] = str(message)
+
+    return progress
+
+
+def _run_inpaint_job(
+    job_id: str,
+    video_path: str,
+    out_path: str,
+    regions: list[dict],
+    engine: str,
+    time_range: Optional[tuple[float, float]],
+) -> None:
+    """背景執行緒主體:跑 inpaint.remove_text,完成/失敗都回寫 INPAINT_JOBS。
+
+    來源影片在結束時清掉;輸出 mp4 保留供 result 端點下載 (由前端取走後再清,
+    或隨暫存目錄被作業系統回收)。永不讓伺服器崩潰。
+    """
+    progress = _make_inpaint_progress(job_id)
+    try:
+        progress("inpaint", 0.0, "準備中…")
+        if inpaint is None:  # pragma: no cover - 已由 _require_inpaint 擋住,雙保險
+            raise RuntimeError("pipeline.inpaint 不可用")
+        result = inpaint.remove_text(
+            video_path,
+            regions,
+            out_path,
+            engine=engine,
+            device="auto",
+            time_range=time_range,
+            progress=progress,
+        )
+        with _INPAINT_JOBS_LOCK:
+            job = INPAINT_JOBS.get(job_id)
+            if job is not None:
+                job["status"] = "done"
+                job["pct"] = 100.0
+                job["message"] = "完成 Done"
+                job["meta"] = result
+                job["error"] = None
+        logger.info("文字移除工作 %s 完成。", job_id)
+    except Exception as e:  # noqa: BLE001 - 任何失敗都收斂成 error 狀態
+        tb = traceback.format_exc()
+        logger.error("文字移除工作 %s 失敗:%s\n%s", job_id, e, tb)
+        with _INPAINT_JOBS_LOCK:
+            job = INPAINT_JOBS.get(job_id)
+            if job is not None:
+                job["status"] = "error"
+                job["message"] = str(e)
+                job["error"] = str(e)
+    finally:
+        # 清掉暫存來源影片 (輸出 mp4 留著給 result 端點)。
+        try:
+            if video_path and os.path.exists(video_path):
+                os.remove(video_path)
+        except OSError:
+            pass
+
+
+@app.post("/api/inpaint/frame")
+async def api_inpaint_frame(
+    video: UploadFile = File(...),
+    at: float = Form(0.0),
+) -> Response:
+    """擷取影片某時間點的單幀為 JPEG,供前端畫布讓使用者框選要移除的區域。
+
+    multipart:video=影片檔,at=秒 (預設 0)。回傳 image/jpeg。
+    """
+    _require_inpaint()
+
+    # 存上傳影片到暫存 (保留副檔名讓 PyAV 好認),抽幀後立刻刪除。
+    tmp_id = uuid.uuid4().hex
+    suffix = _safe_upload_suffix(video.filename)
+    dest = UPLOAD_DIR / f"frame_{tmp_id}{suffix}"
+    try:
+        data = await video.read()
+        if not data:
+            raise HTTPException(status_code=400, detail="上傳的影片是空的")
+        dest.write_bytes(data)
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=f"上傳影片儲存失敗:{e}") from e
+    finally:
+        await video.close()
+
+    try:
+        jpeg = inpaint.first_frame_jpeg(str(dest), at_sec=float(at))  # type: ignore[union-attr]
+    except Exception as e:  # noqa: BLE001
+        logger.error("擷取影格失敗:%s", e)
+        raise HTTPException(status_code=500, detail=f"擷取影格失敗:{e}") from e
+    finally:
+        try:
+            if dest.exists():
+                dest.unlink()
+        except OSError:
+            pass
+
+    return Response(content=jpeg, media_type="image/jpeg")
+
+
+@app.post("/api/inpaint")
+async def api_inpaint(
+    video: UploadFile = File(...),
+    regions: str = Form(...),
+    engine: str = Form("lama"),
+    startSec: Optional[float] = Form(None),
+    endSec: Optional[float] = Form(None),
+) -> JSONResponse:
+    """建立文字移除工作。multipart:video=影片,regions=JSON 字串
+    ([{x,y,w,h} 正規化 0..1]),engine=lama|opencv,選用 startSec/endSec。
+
+    回傳 { jobId };背景執行緒跑 inpaint.remove_text → 暫存 <jobId>.mp4。
+    """
+    _require_inpaint()
+
+    # 1) 解析 regions JSON
+    try:
+        parsed = json.loads(regions) if regions else []
+        if not isinstance(parsed, list) or not parsed:
+            raise ValueError("regions 必須是非空陣列")
+        clean_regions: list[dict] = []
+        for r in parsed:
+            if not isinstance(r, dict):
+                raise ValueError("每個區域必須是物件 {x,y,w,h}")
+            clean_regions.append(
+                {
+                    "x": float(r["x"]),
+                    "y": float(r["y"]),
+                    "w": float(r["w"]),
+                    "h": float(r["h"]),
+                }
+            )
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=f"regions 解析失敗:{e}") from e
+
+    eng = (engine or "lama").strip().lower()
+    if eng not in ("lama", "opencv"):
+        eng = "lama"
+
+    # time_range:兩端都有才成立;只給一端則視為無效時間窗 → 全片處理。
+    time_range: Optional[tuple[float, float]] = None
+    if startSec is not None and endSec is not None:
+        try:
+            time_range = (float(startSec), float(endSec))
+        except (TypeError, ValueError):
+            time_range = None
+
+    # 2) 存上傳影片到暫存 (保留副檔名)
+    job_id = uuid.uuid4().hex
+    suffix = _safe_upload_suffix(video.filename)
+    src = UPLOAD_DIR / f"inpaint_{job_id}{suffix}"
+    out = UPLOAD_DIR / f"{job_id}.mp4"
+    try:
+        data = await video.read()
+        if not data:
+            raise HTTPException(status_code=400, detail="上傳的影片是空的")
+        src.write_bytes(data)
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=f"上傳影片儲存失敗:{e}") from e
+    finally:
+        await video.close()
+
+    # 3) 登記工作 + 起背景執行緒
+    with _INPAINT_JOBS_LOCK:
+        INPAINT_JOBS[job_id] = {
+            "status": "queued",
+            "pct": 0.0,
+            "message": "已建立工作,等待開始…",
+            "error": None,
+            "meta": None,
+            "_video_path": str(src),
+            "_out_path": str(out),
+        }
+
+    thread = threading.Thread(
+        target=_run_inpaint_job,
+        args=(job_id, str(src), str(out), clean_regions, eng, time_range),
+        name=f"autolyrics-inpaint-{job_id[:8]}",
+        daemon=True,
+    )
+    thread.start()
+
+    return JSONResponse({"jobId": job_id})
+
+
+@app.get("/api/inpaint/jobs/{job_id}")
+def api_get_inpaint_job(job_id: str) -> JSONResponse:
+    """輪詢文字移除工作狀態。GET /api/inpaint/jobs/{jobId}"""
+    with _INPAINT_JOBS_LOCK:
+        job = INPAINT_JOBS.get(job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="找不到此文字移除工作 jobId")
+        payload: dict[str, Any] = {
+            "status": job["status"],
+            "pct": job["pct"],
+            "message": job["message"],
+            "error": job.get("error"),
+            "meta": job.get("meta"),
+        }
+    return JSONResponse(payload)
+
+
+@app.get("/api/inpaint/jobs/{job_id}/result")
+def api_get_inpaint_result(job_id: str) -> FileResponse:
+    """下載文字移除輸出的 mp4。GET /api/inpaint/jobs/{jobId}/result
+
+    工作未完成 (或檔案不存在) → 404;完成 → video/mp4 附件下載。
+    """
+    with _INPAINT_JOBS_LOCK:
+        job = INPAINT_JOBS.get(job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="找不到此文字移除工作 jobId")
+        if job["status"] != "done":
+            raise HTTPException(status_code=404, detail="工作尚未完成,結果尚未就緒")
+        out_path = job.get("_out_path")
+    if not out_path or not os.path.exists(out_path):
+        raise HTTPException(status_code=404, detail="找不到輸出檔案")
+    return FileResponse(
+        out_path,
+        media_type="video/mp4",
+        filename="cleaned.mp4",
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -22,10 +22,11 @@ export const common: Record<string, Entry> = {
   },
   'common.localFirst': { zh: '本機', en: 'LOCAL-FIRST' },
 
-  // ── Top-level product mode (Song lyrics / Video → Subtitles) ──
+  // ── Top-level product mode (Song lyrics / Video → Subtitles / Clean Text) ──
   'common.mode.switchAria': { zh: '產品模式', en: 'Product mode' },
   'common.mode.song': { zh: '歌曲歌詞', en: 'Lyrics' },
   'common.mode.video': { zh: '影片字幕', en: 'Subtitles' },
+  'common.mode.clean': { zh: '文字移除', en: 'Clean Text' },
   'common.mode.songTitle': {
     zh: '歌曲歌詞 — 分離人聲、辨識、對齊出逐字卡拉 OK',
     en: 'Song lyrics — separate vocals, transcribe, align word-level karaoke',
@@ -33,6 +34,10 @@ export const common: Record<string, Entry> = {
   'common.mode.videoTitle': {
     zh: '影片字幕 — 影片或音訊轉成乾淨字幕',
     en: 'Video → Subtitles — turn a video or audio file into clean captions',
+  },
+  'common.mode.cleanTitle': {
+    zh: '文字移除 — 框出影片上多餘的文字，AI 逐幀填補成背景並保留原音軌',
+    en: 'Clean Text — box unwanted text on a video; AI fills it in frame-by-frame and keeps the original audio',
   },
 
   // ── Window controls (titlebar) ──

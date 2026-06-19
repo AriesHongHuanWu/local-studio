@@ -68,15 +68,15 @@ if [ "$HAS_NVIDIA" -eq 1 ]; then
     echo ""
     echo "✓ 偵測到 NVIDIA GPU → 安裝 CUDA (cu128) 版 PyTorch"
     echo "  (RTX 5060 / Blackwell sm_120 需要 cu128 wheel)"
-    if ! "$VPYTHON" -m pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu128; then
+    if ! "$VPYTHON" -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128; then
         echo "⚠ cu128 安裝失敗,改裝 CPU 版 PyTorch 作為後備。"
-        "$VPYTHON" -m pip install torch torchaudio
+        "$VPYTHON" -m pip install torch torchvision torchaudio
     fi
 else
     echo ""
     echo "ℹ 未偵測到 NVIDIA GPU → 安裝 CPU 版 PyTorch(預設 PyPI)。"
     echo "  辨識仍可運作,但速度較慢。"
-    "$VPYTHON" -m pip install torch torchaudio
+    "$VPYTHON" -m pip install torch torchvision torchaudio
 fi
 
 # --- 安裝其餘相依 -----------------------------------------------------------
@@ -87,6 +87,16 @@ if [ -f "$REQ" ]; then
     "$VPYTHON" -m pip install -r "$REQ"
 else
     echo "⚠ 找不到 requirements.txt,略過。"
+fi
+
+# --- 安裝 LaMa inpainting (--no-deps,文字移除模式的 AI 引擎) ----------------
+# simple-lama-inpainting 把 numpy<2 / pillow<10 釘得過保守,直接裝會把 cu128
+# 技術棧降版弄壞;它實測在 numpy 2.x / pillow 12 上運作正常,故 --no-deps 跳過
+# 那些過時釘選。失敗只警告、不中止 —— LaMa 不可用時會自動退回 OpenCV 後備。
+echo ""
+echo "→ 安裝 LaMa inpainting (simple-lama-inpainting, --no-deps) …"
+if ! "$VPYTHON" -m pip install --no-deps simple-lama-inpainting; then
+    echo "⚠ LaMa 安裝失敗 —— 文字移除會退回 OpenCV 後備 (品質略降,功能仍可用)。"
 fi
 
 echo ""

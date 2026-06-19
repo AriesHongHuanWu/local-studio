@@ -9,7 +9,7 @@
    ────────────────────────────────────────────────────────────────── */
 
 import { useCallback, useRef } from 'react';
-import { Music, Clapperboard } from 'lucide-react';
+import { Music, Clapperboard, Eraser } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useMode } from '../../state/useMode';
 import type { AppMode } from '../../state/useMode';
@@ -26,6 +26,7 @@ interface ModeDef {
 const MODES: ModeDef[] = [
   { mode: 'song', labelKey: 'common.mode.song', titleKey: 'common.mode.songTitle', icon: Music },
   { mode: 'video', labelKey: 'common.mode.video', titleKey: 'common.mode.videoTitle', icon: Clapperboard },
+  { mode: 'clean', labelKey: 'common.mode.clean', titleKey: 'common.mode.cleanTitle', icon: Eraser },
 ];
 
 export interface ModeSwitchProps {

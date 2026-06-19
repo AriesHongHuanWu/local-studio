@@ -13,6 +13,7 @@ import { StageProgress } from './StageProgress';
 import { SetupBanner } from './SetupBanner';
 import { VideoPreview } from './VideoPreview';
 import { CueList } from './CueList';
+import { CleanTextFlow } from './CleanTextFlow';
 import { useMeta } from '../../state/useMeta';
 import { useJob } from '../../state/useJob';
 import { useResultStore } from '../../state/useResultStore';
@@ -309,6 +310,14 @@ export function TranscribeTab({ onOpenEditor }: TranscribeTabProps) {
     reset();
     setElapsed(0);
   };
+
+  // Clean Text (文字移除) is a self-contained surface — its own file picker,
+  // box canvas, job + poll, and result video. It shares none of the song /
+  // video transcription state, so render it instead of the tab body here.
+  // (All hooks above still run, keeping hook order stable across modes.)
+  if (appMode === 'clean') {
+    return <CleanTextFlow />;
+  }
 
   return (
     <div className="al-tabpage">

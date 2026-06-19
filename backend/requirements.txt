@@ -32,3 +32,15 @@ python-multipart>=0.0.9
 # --- 音訊 I/O ---
 soundfile>=0.12
 numpy>=1.24
+
+# --- 影片文字 / 區域移除(inpaint;「文字移除 / Clean Text」模式)---
+# OpenCV 提供免模型的 cv2.inpaint(Telea) 後備路徑(LaMa 不可用時自動退回)。
+opencv-python>=4.8.0
+#
+# 注意:LaMa 引擎的 `simple-lama-inpainting` 刻意「不」列在這裡 —— 它必須用
+#   pip install --no-deps simple-lama-inpainting
+# 單獨安裝(見 install.ps1 / install.sh / lib.rs run_setup)。原因:它把
+# numpy<2、pillow<10 釘得過保守,若隨依賴一起裝會把 cu128 技術棧的
+# numpy 2.x / pillow 12 降版、連帶弄壞 torch。實測它在 numpy 2.x / pillow 12
+# 上運作完全正常,故以 --no-deps 跳過那些過時的版本釘選。
+# (av / PyAV 由 torch / faster-whisper 連帶帶入;影片解碼/編碼即靠它。)

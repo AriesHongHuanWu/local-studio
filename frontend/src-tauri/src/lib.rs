@@ -753,6 +753,7 @@ fn run_setup(app: &AppHandle) -> Result<PathBuf, String> {
             "pip",
             "install",
             "torch",
+            "torchvision",
             "torchaudio",
             "--index-url",
             "https://download.pytorch.org/whl/cu128",
@@ -766,14 +767,14 @@ fn run_setup(app: &AppHandle) -> Result<PathBuf, String> {
                 format!("cu128 安裝失敗,改裝 CPU 版作後備 ({})", e),
             );
             let mut cpu = Command::new(&vpython);
-            cpu.args(["-m", "pip", "install", "torch", "torchaudio"])
+            cpu.args(["-m", "pip", "install", "torch", "torchvision", "torchaudio"])
                 .current_dir(&backend_dir);
             run_streaming(app, "安裝 CPU PyTorch (後備)", cpu, 65.0, 75.0)?;
         }
     } else {
         emit_progress(app, 24.0, "未偵測到 NVIDIA GPU → 安裝 CPU 版 PyTorch …");
         let mut cmd = Command::new(&vpython);
-        cmd.args(["-m", "pip", "install", "torch", "torchaudio"])
+        cmd.args(["-m", "pip", "install", "torch", "torchvision", "torchaudio"])
             .current_dir(&backend_dir);
         run_streaming(app, "安裝 CPU PyTorch", cmd, 24.0, 65.0)?;
     }
@@ -789,9 +790,38 @@ fn run_setup(app: &AppHandle) -> Result<PathBuf, String> {
             .arg("-r")
             .arg(&req)
             .current_dir(&backend_dir);
-        run_streaming(app, "安裝 requirements", cmd, 78.0, 98.0)?;
+        run_streaming(app, "安裝 requirements", cmd, 78.0, 96.0)?;
     } else {
-        emit_progress(app, 98.0, "找不到 requirements.txt,略過。");
+        emit_progress(app, 96.0, "找不到 requirements.txt,略過。");
+    }
+
+    // (g) 安裝 LaMa inpainting (--no-deps,文字移除模式的 AI 引擎)。
+    //     simple-lama-inpainting 把 numpy<2 / pillow<10 釘得過保守,直接裝會把
+    //     cu128 技術棧降版弄壞;它實測在 numpy 2.x / pillow 12 上運作正常,故
+    //     --no-deps 跳過那些過時釘選。
+    //     **此步刻意不可中止 setup** —— 失敗只發警告 (LaMa 不可用時文字移除會
+    //     自動退回 OpenCV 後備,功能仍在),確保整體安裝照常完成。
+    emit_progress(app, 98.0, "安裝 LaMa inpainting (simple-lama-inpainting, --no-deps) …");
+    {
+        let mut cmd = Command::new(&vpython);
+        cmd.args([
+            "-m",
+            "pip",
+            "install",
+            "--no-deps",
+            "simple-lama-inpainting",
+        ])
+        .current_dir(&backend_dir);
+        if let Err(e) = run_streaming(app, "安裝 LaMa inpainting", cmd, 98.0, 99.0) {
+            emit_progress(
+                app,
+                99.0,
+                format!(
+                    "LaMa 安裝失敗,文字移除將退回 OpenCV 後備 (品質略降,功能仍可用): {}",
+                    e
+                ),
+            );
+        }
     }
 
     emit_progress(app, 99.0, "後端環境安裝完成。");

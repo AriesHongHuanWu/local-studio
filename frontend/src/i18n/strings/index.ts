@@ -19,6 +19,7 @@ import { setup } from './setup';
 import { hardware } from './hardware';
 import { update } from './update';
 import { video } from './video';
+import { clean } from './clean';
 
 /** Flat, namespaced string table. Keys look like 'namespace.key'. */
 export const STRINGS: Record<string, Entry> = {
@@ -32,6 +33,7 @@ export const STRINGS: Record<string, Entry> = {
   ...hardware,
   ...update,
   ...video,
+  ...clean,
 };
 
 // Dev-only guard: catch accidental key collisions across namespaces.
@@ -39,7 +41,7 @@ export const STRINGS: Record<string, Entry> = {
 if (import.meta.env?.DEV) {
   const seen = new Set<string>();
   const dupes: string[] = [];
-  for (const ns of [common, transcribe, editor, exportStrings, library, settings, setup, hardware, update, video]) {
+  for (const ns of [common, transcribe, editor, exportStrings, library, settings, setup, hardware, update, video, clean]) {
     for (const key of Object.keys(ns)) {
       if (seen.has(key)) dupes.push(key);
       seen.add(key);

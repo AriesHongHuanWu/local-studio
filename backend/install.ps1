@@ -112,10 +112,10 @@ if ($HasNvidia) {
     Write-Host ""
     Write-Host "✓ 偵測到 NVIDIA GPU → 安裝 CUDA (cu128) 版 PyTorch" -ForegroundColor Green
     Write-Host "  (RTX 5060 / Blackwell sm_120 需要 cu128 wheel)" -ForegroundColor DarkGray
-    & $VPython -m pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu128
+    & $VPython -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
     if ($LASTEXITCODE -ne 0) {
         Write-Host "⚠ cu128 安裝失敗,改裝 CPU 版 PyTorch 作為後備。" -ForegroundColor Yellow
-        & $VPython -m pip install torch torchaudio
+        & $VPython -m pip install torch torchvision torchaudio
         if ($LASTEXITCODE -ne 0) {
             Write-Host "✗ PyTorch 安裝失敗。" -ForegroundColor Red
             exit 1
@@ -125,7 +125,7 @@ if ($HasNvidia) {
     Write-Host ""
     Write-Host "ℹ 未偵測到 NVIDIA GPU → 安裝 CPU 版 PyTorch(預設 PyPI)。" -ForegroundColor Yellow
     Write-Host "  辨識仍可運作,但速度較慢。" -ForegroundColor DarkGray
-    & $VPython -m pip install torch torchaudio
+    & $VPython -m pip install torch torchvision torchaudio
     if ($LASTEXITCODE -ne 0) {
         Write-Host "✗ PyTorch 安裝失敗。" -ForegroundColor Red
         exit 1
@@ -144,6 +144,17 @@ if (Test-Path $Req) {
     }
 } else {
     Write-Host "⚠ 找不到 requirements.txt,略過。" -ForegroundColor Yellow
+}
+
+# --- 安裝 LaMa inpainting (--no-deps,文字移除模式的 AI 引擎) ----------------
+# simple-lama-inpainting 把 numpy<2 / pillow<10 釘得過保守,直接裝會把 cu128
+# 技術棧降版弄壞;它實測在 numpy 2.x / pillow 12 上運作正常,故 --no-deps 跳過
+# 那些過時釘選。失敗只警告、不中止 —— LaMa 不可用時會自動退回 OpenCV 後備。
+Write-Host ""
+Write-Host "→ 安裝 LaMa inpainting (simple-lama-inpainting, --no-deps) …" -ForegroundColor Cyan
+& $VPython -m pip install --no-deps simple-lama-inpainting
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "⚠ LaMa 安裝失敗 —— 文字移除會退回 OpenCV 後備 (品質略降,功能仍可用)。" -ForegroundColor Yellow
 }
 
 Write-Host ""

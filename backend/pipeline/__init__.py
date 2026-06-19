@@ -1,10 +1,12 @@
 """
 AutoLyrics 辨識引擎管線套件 (pipeline package).
 
-對外只暴露兩類東西:
+對外只暴露三類東西:
   - ``run``                          —— 一鍵跑完整管線 (分離 → 辨識/對齊 → 整形)
   - ``to_lrc`` / ``to_srt`` / ``to_vtt`` /
     ``to_ass`` / ``to_json``         —— 把 Result 轉成各種輸出格式
+  - ``inpaint``                      —— 影片文字 / 區域移除 (AI inpainting) 子模組,
+    供「文字移除 / Clean Text」模式使用 (見 pipeline/inpaint.py)。
 
 設計原則:本套件的 *import 階段* 絕不可因為任一相依模組 (torch / demucs /
 faster-whisper / ctc-forced-aligner …) 缺席而炸掉。子模組各自會把重相依包在
@@ -20,7 +22,7 @@ from typing import Any, Callable
 
 logger = logging.getLogger("autolyrics.pipeline")
 
-__all__ = ["run", "to_lrc", "to_srt", "to_vtt", "to_ass", "to_json"]
+__all__ = ["run", "to_lrc", "to_srt", "to_vtt", "to_ass", "to_json", "inpaint"]
 
 
 def _missing(symbol: str, module: str, err: Exception) -> Callable[..., Any]:
@@ -68,3 +70,16 @@ except Exception as _e:  # pragma: no cover - 取決於子模組開發狀態
     to_vtt = _missing("to_vtt", "export", _e)  # type: ignore[assignment]
     to_ass = _missing("to_ass", "export", _e)  # type: ignore[assignment]
     to_json = _missing("to_json", "export", _e)  # type: ignore[assignment]
+
+
+# ── inpaint（影片文字 / 區域移除子模組)──────────────────────────────────────
+# inpaint.py 自身的 import 階段已把所有重相依 (av / numpy / torch / simple_lama /
+# cv2) 包進 try/except 並優雅降級 (is_available() 回 False),所以匯入子模組本身
+# 不會炸。這裡仍以 try/except 多包一層保險,讓 `from pipeline import inpaint`
+# 在任何情況下都不致讓伺服器啟動崩潰;真的缺席時 inpaint 為 None,上層端點
+# 會回報 avail=false / 503 而非掛掉。
+try:
+    from . import inpaint as inpaint  # type: ignore[no-redef]
+except Exception as _e:  # pragma: no cover - 取決於子模組開發狀態
+    logger.warning("pipeline.inpaint 載入失敗,文字移除功能將停用:%r", _e)
+    inpaint = None  # type: ignore[assignment]
