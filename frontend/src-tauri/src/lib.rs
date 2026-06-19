@@ -874,6 +874,93 @@ fn restart_backend(app: AppHandle, state: State<'_, BackendProcess>) -> bool {
     state.guarded_spawn_install(&app)
 }
 
+/// 完整重置後端:刪除 WORK 的 `.venv` (+ 暫存 out/jobs/tmp),讓下次啟動重跑安裝精靈。
+///
+/// 供設定頁「儲存空間」面板的「完整重置」分層使用 (保留模型 / 也刪模型):
+///   • `delete_models=true` 時,**前端會先**呼叫 `POST /api/models/clear-all` 把模型
+///     經後端刪掉 (後端才知道 HF/torch 使用者快取的確切路徑);故本指令**不**碰
+///     使用者快取,只負責刪 venv (+ 暫存目錄)。`delete_models` 旗標僅作記錄/轉發。
+///   • `delete_models=false` 時,僅刪 venv —— 使用者快取的模型保留,重裝/修復可重用。
+///
+/// 流程:
+///   (a) `kill()` 後端子行程 (釋放 venv 內 python.exe 的檔案鎖),稍候片刻。
+///   (b) 解析 WORK 後端目錄,`remove_dir_all` 其 `.venv`;另刪暫存 out/jobs/tmp。
+///       **絕不**刪後端原始碼 (app.py/pipeline) —— 下次啟動 `ensure_work_source` 仍可用。
+///   (c) 回 Ok。前端隨後重跑 `checkStatus()` → venv 不存在 → 重新顯示安裝精靈。
+///
+/// 防禦式:路徑不存在就跳過,絕不 panic。
+#[tauri::command]
+fn reset_backend(
+    app: AppHandle,
+    state: State<'_, BackendProcess>,
+    delete_models: bool,
+) -> Result<(), String> {
+    log::info!(
+        "reset_backend 開始 (delete_models={}) —— 刪除 venv + 暫存 WORK 目錄。",
+        delete_models
+    );
+    if delete_models {
+        // 模型已由前端先呼叫 /api/models/clear-all 經後端刪除;此處只記錄,不碰使用者快取。
+        log::info!("reset_backend:delete_models=true (模型應已由前端 clear-all 經後端刪除)。");
+    }
+
+    // (a) 先 kill 後端子行程,釋放 .venv 內 python.exe 的檔案鎖 (否則 Windows 刪不掉)。
+    state.kill();
+    // 稍候片刻讓 OS 真正釋放鎖 (kill() 已 reap,但檔案 handle 釋放可能略有延遲)。
+    std::thread::sleep(Duration::from_millis(500));
+
+    // (b) 解析 WORK 後端目錄。解析不出來 → 視為無事可做 (沒有可重置的 WORK)。
+    let backend_dir = match resolve_backend_dir(&app) {
+        Some((dir, _is_work)) => dir,
+        None => {
+            log::warn!("reset_backend:無法解析後端目錄 —— 略過 (無可重置)。");
+            return Ok(());
+        }
+    };
+
+    // 刪 .venv —— 由 venv_python 反推 venv 根目錄 (…/.venv/Scripts/python.exe → …/.venv)。
+    // 直接用 backend_dir.join(".venv") 也可,但反推保證與啟動時用的同一路徑一致。
+    let venv_dir = venv_python(&backend_dir)
+        .parent() // …/.venv/Scripts (Windows) 或 …/.venv/bin
+        .and_then(|p| p.parent()) // …/.venv
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| backend_dir.join(".venv"));
+
+    if venv_dir.is_dir() {
+        match std::fs::remove_dir_all(&venv_dir) {
+            Ok(_) => log::info!("reset_backend:已刪除 venv {}", venv_dir.display()),
+            Err(e) => {
+                // 刪不掉 (殘留鎖 / 權限) → 回 Err 讓前端能提示使用者 (例如重啟 App 再試)。
+                let msg = format!("刪除 .venv 失敗 ({}): {}", venv_dir.display(), e);
+                log::warn!("reset_backend:{}", msg);
+                return Err(msg);
+            }
+        }
+    } else {
+        log::info!("reset_backend:無 .venv 可刪 ({}),略過。", venv_dir.display());
+    }
+
+    // 另刪 WORK 的暫存/執行期目錄 (out / jobs / tmp) —— 釋放工作產物佔用的空間。
+    // 絕不刪後端原始碼或 models 目錄:原始碼下次啟動由 ensure_work_source 重補,
+    // 模型 (若使用者選擇保留) 在使用者快取 — 本就不在 WORK。缺一個就跳過,不報錯。
+    for transient in ["out", "jobs", "tmp"] {
+        let p = backend_dir.join(transient);
+        if p.is_dir() {
+            match std::fs::remove_dir_all(&p) {
+                Ok(_) => log::info!("reset_backend:已刪除暫存目錄 {}", p.display()),
+                Err(e) => log::warn!(
+                    "reset_backend:刪除暫存目錄 {} 失敗 (已略過): {}",
+                    p.display(),
+                    e
+                ),
+            }
+        }
+    }
+
+    log::info!("reset_backend 完成 —— 下次啟動將重跑安裝精靈。");
+    Ok(())
+}
+
 // ============================================================================
 // 進入點
 // ============================================================================
@@ -917,7 +1004,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             backend_status,
             setup_backend,
-            restart_backend
+            restart_backend,
+            reset_backend
         ])
         .setup(|app| {
             // 啟動後端 sidecar。venv 不存在 (全新機器、尚未跑安裝精靈) 時回 false,

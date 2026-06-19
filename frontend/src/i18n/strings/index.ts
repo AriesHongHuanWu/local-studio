@@ -15,11 +15,13 @@ import { editor } from './editor';
 import { exportStrings } from './export';
 import { library } from './library';
 import { settings } from './settings';
+import { storage } from './storage';
 import { setup } from './setup';
 import { hardware } from './hardware';
 import { update } from './update';
 import { video } from './video';
 import { clean } from './clean';
+import { health } from './health';
 
 /** Flat, namespaced string table. Keys look like 'namespace.key'. */
 export const STRINGS: Record<string, Entry> = {
@@ -29,11 +31,13 @@ export const STRINGS: Record<string, Entry> = {
   ...exportStrings,
   ...library,
   ...settings,
+  ...storage,
   ...setup,
   ...hardware,
   ...update,
   ...video,
   ...clean,
+  ...health,
 };
 
 // Dev-only guard: catch accidental key collisions across namespaces.
@@ -41,7 +45,7 @@ export const STRINGS: Record<string, Entry> = {
 if (import.meta.env?.DEV) {
   const seen = new Set<string>();
   const dupes: string[] = [];
-  for (const ns of [common, transcribe, editor, exportStrings, library, settings, setup, hardware, update, video, clean]) {
+  for (const ns of [common, transcribe, editor, exportStrings, library, settings, storage, setup, hardware, update, video, clean, health]) {
     for (const key of Object.keys(ns)) {
       if (seen.has(key)) dupes.push(key);
       seen.add(key);

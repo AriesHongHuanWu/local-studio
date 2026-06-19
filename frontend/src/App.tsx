@@ -13,9 +13,16 @@ import { useJob } from './state/useJob';
 import { useLibrary } from './state/useLibrary';
 import { useModels } from './state/useModels';
 import { useSetup } from './state/useSetup';
+import { useHealth } from './state/useHealth';
 import { SetupScreen } from './components/setup/SetupScreen';
 import { makeT, useI18n } from './i18n';
 import { UpdateBanner } from './components/update/UpdateBanner';
+import { HealthBanner } from './components/health/HealthBanner';
+
+// Re-run the environment health-check on this cadence so a model/dep that
+// goes missing mid-session (deleted, or a half-finished setup) surfaces
+// without a manual reload.
+const HEALTH_RECHECK_MS = 60_000;
 
 const COLLAPSE_WIDTH = 900;
 
@@ -36,6 +43,7 @@ export default function App() {
   const loadMeta = useMeta((s) => s.load);
   const loadModels = useModels((s) => s.load);
   const disposeModels = useModels((s) => s.disposeAll);
+  const refreshHealth = useHealth((s) => s.refresh);
 
   // Load /api/meta and model list once at startup (fall back gracefully if offline).
   // Tear down any in-flight model-download polling timers on unmount.
@@ -44,6 +52,18 @@ export default function App() {
     void loadModels();
     return () => disposeModels();
   }, [loadMeta, loadModels, disposeModels]);
+
+  // Environment health-check: only meaningful AFTER first-run setup (when a
+  // venv exists). Refresh once we're past the SetupScreen gate, then poll on
+  // an interval so a piece deleted mid-session re-surfaces the HealthBanner.
+  // (The SetupScreen handles the no-venv first-run; HealthBanner is for after.)
+  const pastSetup = !(inTauri && needsSetup);
+  useEffect(() => {
+    if (!pastSetup) return;
+    void refreshHealth();
+    const id = window.setInterval(() => void refreshHealth(), HEALTH_RECHECK_MS);
+    return () => window.clearInterval(id);
+  }, [pastSetup, refreshHealth]);
 
   // After first-run setup finishes (needsSetup true→false), the Rust shell spawns
   // uvicorn, which needs several seconds to bind 127.0.0.1:8756 (torch/whisper
@@ -129,6 +149,9 @@ export default function App() {
           between the titlebar and the content area. Only renders in Tauri
           when an update is found (or during download / on error). */}
       <UpdateBanner />
+      {/* Health banner: warns + self-heals when a dep/model is missing AFTER
+          first-run setup. Self-hides when everything required is present. */}
+      <HealthBanner />
       <div className="al-shell">
         <TabRail active={tab} onChange={setTab} collapsed={collapsed} />
         <div className="al-main">

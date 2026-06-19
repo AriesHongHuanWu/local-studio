@@ -3,6 +3,7 @@ import { FolderLock, Cpu, Layers3, RotateCcw, ShieldCheck } from 'lucide-react';
 import { Button, Eyebrow } from '../../components/primitives';
 import { GpuReadout } from './GpuReadout';
 import { ModelManager } from './ModelManager';
+import { StoragePanel } from './StoragePanel';
 import { ModelSizePicker } from './ModelSizePicker';
 import { EnginePicker } from './EnginePicker';
 import { DevicePicker } from './DevicePicker';
@@ -130,9 +131,20 @@ export function SettingsTab() {
           <UpdateSettingsRow />
         </section>
 
+        {/* ── STORAGE ── */}
+        <section className="al-settings__group">
+          <div className="al-settings__grouphead">
+            <Eyebrow num={7}>{t('storage.title')}</Eyebrow>
+          </div>
+          <p className="al-settings__caption" style={{ textTransform: 'none', letterSpacing: 0 }}>
+            {t('storage.lede')}
+          </p>
+          <StoragePanel />
+        </section>
+
         {/* ── LOCAL ASSURANCE ── */}
         <section className="al-settings__group">
-          <Eyebrow num={7}>{t('settings.privacy')}</Eyebrow>
+          <Eyebrow num={8}>{t('settings.privacy')}</Eyebrow>
           <div className="al-panel al-assurance">
             <div className="al-assurance__lead">
               <ShieldCheck size={16} className="al-assurance__shield" />

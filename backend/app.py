@@ -22,6 +22,7 @@ import json
 import logging
 import os
 import shutil
+import sys
 import tempfile
 import threading
 import time
@@ -923,6 +924,53 @@ def api_export_edited(body: ExportBody) -> Response:
 # 模型管理端點
 # ─────────────────────────────────────────────────────────────────────────────
 
+@app.get("/api/health")
+def api_health() -> JSONResponse:
+    """GET /api/health — 環境健檢 + 自我修復報告。
+
+    回報 Python 相依 (可 import + 版本)、CUDA、每個模型「有 vs 缺」,並彙整一份
+    missing 清單供 UI 警告 + 只補抓缺少的部分。委派給 pipeline.health.full_report()。
+
+    防禦式:即使 pipeline.health 或一堆重型相依缺席 (這正是它要偵測的情形),也絕不
+    回 500 —— 退回一個最小化的 degraded 報告 (healthy=false),讓 UI 仍能引導修復。
+    """
+    try:
+        from pipeline import health  # type: ignore
+
+        return JSONResponse(health.full_report())
+    except Exception as e:  # noqa: BLE001 - 連 health 模組都載不進來也不能 500
+        logger.error("健檢模組不可用,回退最小化 degraded 報告:%r", e)
+        return JSONResponse(
+            {
+                "healthy": False,
+                "backend": "degraded",
+                "deps": {},
+                "cuda": {
+                    "available": False,
+                    "version": None,
+                    "gpuName": None,
+                    "vramTotalMB": None,
+                },
+                "models": [],
+                "missing": [
+                    {
+                        "category": "dep",
+                        "id": "pipeline.health",
+                        "label": "Health module",
+                        "required": True,
+                        "reason": f"健檢模組載入失敗 · health module failed to load: {e}",
+                    }
+                ],
+                "features": {
+                    "songLyrics": False,
+                    "videoSubtitles": False,
+                    "cleanText": False,
+                },
+                "version": VERSION,
+            }
+        )
+
+
 @app.get("/api/hardware")
 def api_hardware() -> JSONResponse:
     """GET /api/hardware — machine hardware detection + model recommendation.
@@ -987,6 +1035,148 @@ def api_list_models() -> JSONResponse:
         "diskUsedMB": _disk_used_mb(),
         "cacheDir": _cache_dir_display(),
         "gpuVramTotalMB": _gpu_vram_total_mb(),
+    })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 儲存空間 (Storage) — 用量明細 + 清除所有模型
+# 給設定頁「儲存空間」面板:讓使用者分層選擇要刪什麼 (單一模型 / 全部模型 /
+# 完整重置)。本檔負責「全部模型」與用量明細;venv / WORK 重置由 Tauri 殼層 (lib.rs)
+# 的 reset_backend 指令處理 (它知道 venv 路徑且能先 kill 後端釋放 python.exe 鎖)。
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _venv_size_mb() -> float:
+    """量測「目前執行中的 venv」磁碟用量 (MB) = sys.prefix 目錄遞迴加總。
+
+    防禦式:逐檔 try/except 跳過讀不到的檔 (鎖定/權限);整體再包一層 try/except,
+    任何失敗都回 0.0 而非崩潰 —— 用量明細缺一個數字也不該讓端點掛掉。
+    """
+    try:
+        root = sys.prefix
+        if not root or not os.path.isdir(root):
+            return 0.0
+        total = 0
+        for dirpath, _dirs, files in os.walk(root):
+            for name in files:
+                fp = os.path.join(dirpath, name)
+                try:
+                    total += os.path.getsize(fp)
+                except OSError:
+                    continue
+        return round(total / (1024.0 * 1024.0), 1)
+    except Exception as e:  # noqa: BLE001 - 用量量測絕不崩潰
+        logger.warning("量測 venv 大小失敗 (回 0):%r", e)
+        return 0.0
+
+
+@app.get("/api/storage")
+def api_storage() -> JSONResponse:
+    """GET /api/storage — 儲存空間用量明細,供設定頁「儲存空間」面板。
+
+    回傳:
+      { venvMB, modelsMB, models:[{id,label,kind,sizeOnDiskMB,required,installed}],
+        cacheDir, totalMB }
+
+    venvMB = 目前執行中 venv (sys.prefix) 的遞迴大小;無法計算則 0。
+    modelsMB = pipeline.models.disk_used_mb() (所有模型快取總用量)。
+    models = 全部模型 (含未安裝;只有 installed 者真正佔空間)。
+    防禦式:任何子項失敗都回退安全值,端點永不 500。
+    """
+    venv_mb = _venv_size_mb()
+
+    mods = _models()
+    models_mb = 0.0
+    cache_dir = ""
+    model_rows: list[dict[str, Any]] = []
+    if mods is not None:
+        try:
+            models_mb = float(mods.disk_used_mb())
+        except Exception as e:  # noqa: BLE001
+            logger.warning("disk_used_mb 失敗 (回 0):%r", e)
+        try:
+            cache_dir = str(mods.cache_root())
+        except Exception as e:  # noqa: BLE001
+            logger.warning("cache_root 失敗 (回退):%r", e)
+        try:
+            for m in mods.list_models():
+                model_rows.append({
+                    "id": m.get("id"),
+                    "label": m.get("label"),
+                    "kind": m.get("kind"),
+                    "sizeOnDiskMB": round(float(m.get("sizeOnDiskMB") or 0.0), 1),
+                    "required": bool(m.get("required")),
+                    "installed": bool(m.get("installed")),
+                })
+        except Exception as e:  # noqa: BLE001
+            logger.warning("list_models 失敗 (回退空清單):%r", e)
+    else:
+        # pipeline.models 缺席 → 回退到本檔內建偵測 (與 /api/models 一致)。
+        try:
+            models_mb = _disk_used_mb()
+            cache_dir = _cache_dir_display()
+            for d in _MODEL_DEFS:
+                info = _build_model_info(d)
+                model_rows.append({
+                    "id": info.get("id"),
+                    "label": info.get("label"),
+                    "kind": info.get("kind"),
+                    "sizeOnDiskMB": round(float(info.get("sizeOnDiskMB") or 0.0), 1),
+                    "required": bool(info.get("required")),
+                    "installed": bool(info.get("installed")),
+                })
+        except Exception as e:  # noqa: BLE001
+            logger.warning("儲存明細回退偵測失敗:%r", e)
+
+    total_mb = round(venv_mb + models_mb, 1)
+    return JSONResponse({
+        "venvMB": round(venv_mb, 1),
+        "modelsMB": round(models_mb, 1),
+        "models": model_rows,
+        "cacheDir": cache_dir,
+        "totalMB": total_mb,
+    })
+
+
+@app.post("/api/models/clear-all")
+def api_clear_all_models() -> JSONResponse:
+    """POST /api/models/clear-all — 刪除「所有」已安裝的模型檔。
+
+    回傳 { clearedIds:[...], freedMB }。
+
+    對每個已安裝模型呼叫 pipeline.models.delete(id, force=True),旁路 required /
+    最後一個 Whisper 守門 —— 使用者明確選擇「清除所有模型」,health/self-heal 會在
+    下次需要時自動補抓必需模型。防禦式:單一模型刪除失敗只記 log、不中止其餘刪除。
+    """
+    mods = _models()
+    if mods is None:
+        raise HTTPException(status_code=500, detail="pipeline.models 不可用,無法清除模型")
+
+    try:
+        all_models = mods.list_models()
+    except Exception as e:  # noqa: BLE001
+        logger.error("清除所有模型:列出模型失敗:%r", e)
+        raise HTTPException(status_code=500, detail=f"列出模型失敗:{e}") from e
+
+    cleared_ids: list[str] = []
+    freed_mb = 0.0
+    for m in all_models:
+        if not m.get("installed"):
+            continue
+        model_id = m.get("id")
+        if not model_id:
+            continue
+        try:
+            # force=True 旁路守門 (required / 最後一個 whisper);單一失敗不影響其餘。
+            result = mods.delete(model_id, force=True)
+            freed_mb += float(result.get("freedMB", 0.0))
+            cleared_ids.append(str(model_id))
+            logger.info("清除所有模型:已刪除 %s (釋放 %.1f MB)", model_id, result.get("freedMB", 0.0))
+        except Exception as exc:  # noqa: BLE001 - 一個失敗不可中止其餘
+            logger.error("清除所有模型:刪除 %s 失敗 (已略過):%s", model_id, exc)
+
+    return JSONResponse({
+        "clearedIds": cleared_ids,
+        "freedMB": round(freed_mb, 1),
     })
 
 

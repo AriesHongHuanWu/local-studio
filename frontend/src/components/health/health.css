@@ -1,0 +1,147 @@
+/* ── HealthBanner ──
+   Top-of-shell warn + self-heal strip for the environment health-check.
+   Mirrors the UpdateBanner chrome (mono, hairline-bottom, slide-in) but
+   carries a multi-line body (heading + enumerated "缺少…" + sub-line) and
+   severity-tinted backgrounds: required = amber warning, optional =
+   quieter gold note. */
+
+.al-health-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-3);
+  padding: var(--al-space-2) var(--al-space-5);
+  min-height: 40px;
+  border-bottom: 1px solid var(--al-hairline);
+  font-family: var(--al-font-mono);
+  font-size: var(--al-text-xs);
+  color: var(--al-ink-dim);
+  flex-shrink: 0;
+  animation: al-health-slide-in var(--al-dur-focus, 220ms)
+    var(--al-ease-snap, cubic-bezier(0.2, 0, 0, 1)) both;
+}
+
+@keyframes al-health-slide-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .al-health-banner { animation: none; }
+}
+
+/* -- Variant: required missing (amber warning) ------------------------------ */
+.al-health-banner--required {
+  background: var(--al-amber-glow, color-mix(in srgb, var(--al-amber) 14%, transparent));
+  border-bottom-color: color-mix(in srgb, var(--al-amber) 38%, transparent);
+}
+
+/* -- Variant: optional missing (quieter gold note) -------------------------- */
+.al-health-banner--optional {
+  background: var(--al-gold-glow, color-mix(in srgb, var(--al-gold) 10%, transparent));
+  border-bottom-color: color-mix(in srgb, var(--al-gold) 30%, transparent);
+}
+
+/* -- Variant: repairing (neutral) ------------------------------------------- */
+.al-health-banner--progress {
+  background: var(--al-surface);
+}
+
+/* -- Variant: error --------------------------------------------------------- */
+.al-health-banner--error {
+  background: color-mix(in srgb, var(--al-error, #e06a5a) 9%, transparent);
+  border-bottom-color: color-mix(in srgb, var(--al-error, #e06a5a) 32%, transparent);
+}
+
+/* -- Variant: repaired ok (transient green) --------------------------------- */
+.al-health-banner--ok {
+  background: var(--al-green-glow, color-mix(in srgb, var(--al-green) 12%, transparent));
+  border-bottom-color: color-mix(in srgb, var(--al-green) 34%, transparent);
+}
+
+/* -- Icon ------------------------------------------------------------------- */
+.al-health-banner__icon {
+  flex-shrink: 0;
+  color: var(--al-ink-muted);
+  align-self: flex-start;
+  margin-top: 2px;
+}
+.al-health-banner__icon--amber { color: var(--al-amber); }
+.al-health-banner__icon--gold  { color: var(--al-gold); }
+.al-health-banner__icon--error { color: var(--al-error, #e06a5a); }
+.al-health-banner__icon--ok    { color: var(--al-green); }
+
+/* -- Body (heading + enumerated missing + sub-line) ------------------------- */
+.al-health-banner__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.al-health-banner__heading {
+  font-weight: 600;
+  color: var(--al-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.al-health-banner__notes {
+  color: var(--al-ink-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.al-health-banner__sub {
+  font-size: 10.5px;
+  color: var(--al-ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* -- Single-line message (progress / error / ok states) --------------------- */
+.al-health-banner__msg {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* -- Progress bar ----------------------------------------------------------- */
+.al-health-banner__bar {
+  width: 180px;
+  flex-shrink: 0;
+}
+
+/* -- Action cluster --------------------------------------------------------- */
+.al-health-banner__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-2);
+  flex-shrink: 0;
+}
+
+/* -- Dismiss (X) ------------------------------------------------------------ */
+.al-health-banner__dismiss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  color: var(--al-ink-faint);
+  cursor: pointer;
+  border-radius: var(--al-radius-chip, 4px);
+  flex-shrink: 0;
+  transition: color var(--al-dur-snap, 140ms), background var(--al-dur-snap, 140ms);
+}
+.al-health-banner__dismiss:hover {
+  color: var(--al-ink);
+  background: var(--al-surface-2);
+}
+.al-health-banner__dismiss:focus-visible {
+  outline: 2px solid var(--al-gold);
+  outline-offset: 1px;
+}

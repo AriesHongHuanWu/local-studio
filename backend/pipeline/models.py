@@ -66,6 +66,20 @@ _MMS_FILE = "model.pt"
 _MMS_MIN_BYTES = 800 * 1024 * 1024
 _MMS_MAX_BYTES = 1600 * 1024 * 1024
 
+# LaMa (big-lama) 影片文字移除權重。simple-lama-inpainting 首次使用時會自動
+# 下載到 torch.hub checkpoints/big-lama.pt (~196MB, Apache-2.0)。把它登記進來,
+# 讓 health/repair 能偵測與補抓 (而非藏在 inpaint 的 first-run 黑箱下載)。
+_LAMA_FILE = "big-lama.pt"
+# 來源 (與 inpaint.py 的 SimpleLama 權重同源):simple-lama-inpainting v0.1.0 release。
+_LAMA_URL = (
+    "https://github.com/enesmsahin/simple-lama-inpainting/releases/download/"
+    "v0.1.0/big-lama.pt"
+)
+# big-lama.pt 權重大小帶 (bytes):實測約 196MB,給寬鬆 120MB–320MB 區間以容版本差異。
+# 與 MMS 同理用大小帶把關,避免同名/半截檔誤判為已安裝。
+_LAMA_MIN_BYTES = 120 * 1024 * 1024
+_LAMA_MAX_BYTES = 320 * 1024 * 1024
+
 
 # --------------------------------------------------------------------------- #
 # 靜態模型登記表 (REGISTRY)
@@ -178,6 +192,19 @@ REGISTRY: list[dict[str, Any]] = [
         "vramHint": "~2GB VRAM",
         "whisperSize": None,
         "required": True,
+    },
+    # ── LaMa 文字移除 (Clean Text 模式,非必需) ────────────────────────────
+    {
+        "id": "lama-bigvlama",
+        "kind": "inpaint",
+        "label": "LaMa (文字移除) · LaMa (Text Removal)",
+        # 影片文字移除的 AI 修補權重;缺席時 inpaint 仍會退回 OpenCV,故非必需。
+        "description": "影片文字移除 AI 修補模型 (高品質,缺席時退回 OpenCV) · AI inpainting for video text removal (high quality, OpenCV fallback)",
+        "sizeMB": 196,
+        "recommended": False,
+        "vramHint": "~1.5GB VRAM",
+        "whisperSize": None,
+        "required": False,
     },
 ]
 
@@ -403,6 +430,34 @@ def _mms_status() -> tuple[bool, float]:
     return False, 0.0
 
 
+def _lama_ckpt_path() -> Optional[str]:
+    ck = _checkpoints_dir()
+    if not ck:
+        return None
+    return os.path.join(ck, _LAMA_FILE)
+
+
+def _is_lama_bundle(path: Optional[str]) -> bool:
+    """content-aware 判斷 checkpoints/big-lama.pt 是否真為 LaMa 權重。
+
+    用大小帶 (~196MB) 把關:落在區間外 (例如半截下載檔) 一律不視為已安裝,
+    避免把不完整或同名檔誤判為可用權重 (與 _is_mms_bundle 同理)。
+    """
+    sz = _file_size_bytes(path)
+    return _LAMA_MIN_BYTES <= sz <= _LAMA_MAX_BYTES
+
+
+def _lama_status() -> tuple[bool, float]:
+    """LaMa 偵測:torch hub checkpoints/big-lama.pt 存在且落在大小帶才算已安裝。
+
+    best-effort 純檔案檢查 (不發網路);simple-lama-inpainting 以此檔名快取權重。
+    """
+    p = _lama_ckpt_path()
+    if _is_lama_bundle(p):
+        return True, _bytes_to_mb(_file_size_bytes(p))
+    return False, 0.0
+
+
 def _status_for(meta: dict[str, Any]) -> tuple[bool, float]:
     kind = meta.get("kind")
     if kind == "whisper":
@@ -413,6 +468,8 @@ def _status_for(meta: dict[str, Any]) -> tuple[bool, float]:
         return _demucs_status()
     if kind == "aligner":
         return _mms_status()
+    if kind == "inpaint":
+        return _lama_status()
     return False, 0.0
 
 
@@ -474,6 +531,10 @@ def disk_used_mb() -> float:
         total_bytes += _file_size_bytes(p)
     # mms 對齊模型單檔
     total_bytes += _file_size_bytes(_mms_ckpt_path())
+    # LaMa 文字移除模型單檔 (只在落在大小帶時計入,避免半截檔灌數字)
+    lama_path = _lama_ckpt_path()
+    if _is_lama_bundle(lama_path):
+        total_bytes += _file_size_bytes(lama_path)
 
     return _bytes_to_mb(total_bytes)
 
@@ -656,6 +717,44 @@ def _download_mms(progress: Optional[ProgressFn], size_mb: float) -> None:
     )
 
 
+def _download_lama(progress: Optional[ProgressFn], size_mb: float) -> None:
+    """下載 LaMa (big-lama.pt) 到 torch hub checkpoints/,與 inpaint.py 用的權重同源。
+
+    用 torch.hub.download_url_to_file 直接抓官方 release 檔 (不經 simple_lama 套件,
+    這樣即使 simple-lama-inpainting 尚未安裝也能先把權重備好);量測 scope 到該單檔
+    (含 in-progress 暫存),與其他下載一致避免並行污染進度。
+    """
+    try:
+        import torch  # type: ignore
+    except Exception as exc:  # noqa: BLE001
+        raise RuntimeError(f"torch 不可用,無法下載 LaMa 權重: {exc}") from exc
+
+    ckpt = _lama_ckpt_path()
+    if not ckpt:
+        raise RuntimeError("找不到 torch hub checkpoints 目錄,無法下載 LaMa 權重")
+
+    # 確保目標目錄存在 (torch.hub.download_url_to_file 不會自動建父目錄)。
+    try:
+        os.makedirs(os.path.dirname(ckpt), exist_ok=True)
+    except OSError as exc:
+        raise RuntimeError(f"無法建立 checkpoints 目錄: {exc}") from exc
+
+    start_bytes = _target_file_bytes(ckpt)
+
+    def _fetch() -> None:
+        # progress=False:torch 自己的 tqdm 進度條在無 TTY 的子執行緒無意義;
+        # 我們改用主執行緒量測檔案成長回報 pct (與其他下載一致)。
+        torch.hub.download_url_to_file(_LAMA_URL, ckpt, progress=False)
+
+    worker, holder = _spawn_worker(_fetch)
+    worker.start()
+    _poll_progress_until_done(
+        worker, holder, lambda: _target_file_bytes(ckpt),
+        size_mb=size_mb, start_bytes=start_bytes,
+        message="下載 LaMa 文字移除模型…", progress=progress,
+    )
+
+
 def download(model_id: str, progress: Optional[ProgressFn] = None) -> None:
     """下載指定模型;進度經 progress(pct, message) 回報。失敗丟 RuntimeError。"""
     meta = _BY_ID.get(model_id)
@@ -678,6 +777,8 @@ def download(model_id: str, progress: Optional[ProgressFn] = None) -> None:
                     _download_demucs(progress, size_mb)
             elif kind == "aligner":
                 _download_mms(progress, size_mb)
+            elif kind == "inpaint":
+                _download_lama(progress, size_mb)
             else:
                 raise RuntimeError(f"不支援的模型類型: {kind!r}")
     except RuntimeError:
@@ -733,13 +834,18 @@ def _delete_file(path: Optional[str], label: str) -> float:
     return _bytes_to_mb(freed)
 
 
-def delete(model_id: str) -> dict[str, float]:
+def delete(model_id: str, force: bool = False) -> dict[str, float]:
     """刪除已安裝模型,回傳 {"freedMB": float}。未安裝丟 RuntimeError。
 
     守門 (guards):
       * required 模型 (demucs / aligner) 不可刪除 — 刪了會停用人聲分離 / 強制對齊。
       * whisper 至少保留一個 — 不可刪掉最後一個已安裝的 Whisper。
     這些守門丟 RuntimeError;app.py 會對應成 HTTP 409 回前端。
+
+    ``force=True`` 跳過上述兩道守門 —— 供「清除所有模型 (clear-all)」使用:使用者
+    明確選擇清空全部模型,health/self-heal 會在下次需要時自動補抓必需模型。
+    僅守門被旁路,內容感知 (content-aware) 的安全檢查 (MMS/LaMa 大小帶) 仍保留,
+    避免誤刪同名的無關模型權重。
     """
     meta = _BY_ID.get(model_id)
     if meta is None:
@@ -751,14 +857,16 @@ def delete(model_id: str) -> dict[str, float]:
     kind = meta.get("kind")
 
     # 守門 1:required 模型 (demucs htdemucs / MMS aligner) 不可刪。
-    if meta.get("required"):
+    # force=True (clear-all) 旁路此守門 —— 使用者明確選擇清空全部模型。
+    if not force and meta.get("required"):
         label = meta.get("label", model_id)
         raise ModelDeleteGuardError(
             f"{label} 為必需模型,刪除將停用對應功能 (人聲分離 / 強制對齊),已拒絕。"
         )
 
     # 守門 2:至少保留一個已安裝的 Whisper 模型。
-    if kind == "whisper":
+    # force=True (clear-all) 旁路此守門。
+    if not force and kind == "whisper":
         installed_whisper = [
             m for m in list_models()
             if m.get("kind") == "whisper" and m.get("installed")
@@ -786,6 +894,15 @@ def delete(model_id: str) -> dict[str, float]:
                 "checkpoints/model.pt 不在 MMS 對齊器的預期大小範圍,為避免誤刪其他模型已中止。"
             )
         freed = _delete_file(mms_path, "MMS 對齊器")
+    elif kind == "inpaint":
+        # content-aware:刪前再確認 checkpoints/big-lama.pt 落在 LaMa 大小帶,
+        # 避免半截/同名檔誤刪 (與 MMS 同理)。LaMa 非必需,可刪。
+        lama_path = _lama_ckpt_path()
+        if not _is_lama_bundle(lama_path):
+            raise RuntimeError(
+                "checkpoints/big-lama.pt 不在 LaMa 的預期大小範圍,為避免誤刪其他模型已中止。"
+            )
+        freed = _delete_file(lama_path, "LaMa 文字移除模型")
     else:
         raise RuntimeError(f"不支援的模型類型: {kind!r}")
 
