@@ -46,6 +46,7 @@
 
       <!-- Desktop links -->
       <ul class="nav-links" role="list">
+        <li><a href="#modes"    data-i18n="nav.modes">模式</a></li>
         <li><a href="#features" data-i18n="nav.features">功能</a></li>
         <li><a href="#how"      data-i18n="nav.how">原理</a></li>
         <li><a href="#who"      data-i18n="nav.who">為誰</a></li>
@@ -84,6 +85,7 @@
 
     <!-- Mobile menu -->
     <div id="nav-mobile-menu" class="nav-mobile-menu" role="menu">
+      <a href="#modes"    role="menuitem" data-i18n="nav.modes">模式</a>
       <a href="#features" role="menuitem" data-i18n="nav.features">功能</a>
       <a href="#how"      role="menuitem" data-i18n="nav.how">原理</a>
       <a href="#who"      role="menuitem" data-i18n="nav.who">為誰</a>
@@ -186,86 +188,130 @@
 
 
 <!-- ═══════════════════════════════════════════════════════════════════════════
+     THREE MODES — the headline
+═══════════════════════════════════════════════════════════════════════════════ -->
+<section id="modes" aria-labelledby="modes-heading">
+  <div class="section-wrap">
+    <header class="section-header reveal">
+      <span class="eyebrow" data-i18n="topmodes.eyebrow">三大模式</span>
+      <h2 id="modes-heading" class="section-title" data-i18n="topmodes.title">一個 App，三件事。</h2>
+      <p class="section-sub" data-i18n="topmodes.sub">歌詞、字幕、清字——挑你需要的那一個，全部在你自己的電腦上完成。</p>
+    </header>
+
+    <div class="modes-grid reveal">
+
+      <!-- Mode A: Song lyrics -->
+      <article class="mode-card topmode-card">
+        <span class="topmode-emoji" aria-hidden="true">🎵</span>
+        <div class="mode-name" data-i18n="topmodes.a.name">歌詞模式</div>
+        <p class="mode-desc" data-i18n="topmodes.a.desc">Demucs 人聲分離 → faster-whisper → 強制對齊，產出逐字時間軸歌詞。匯出 LRC / SRT / ASS 卡拉 OK / JSON。</p>
+        <div class="topmode-formats" aria-hidden="true">
+          <span class="fmt-chip">LRC</span><span class="fmt-chip">SRT</span><span class="fmt-chip">ASS</span><span class="fmt-chip">JSON</span>
+        </div>
+      </article>
+
+      <!-- Mode B: Video → Subtitles -->
+      <article class="mode-card topmode-card">
+        <span class="topmode-emoji" aria-hidden="true">🎬</span>
+        <div class="mode-name" data-i18n="topmodes.b.name">影片轉字幕</div>
+        <p class="mode-desc" data-i18n="topmodes.b.desc">任何影片或音訊直接語音轉寫，產出乾淨字幕——自動斷行、每段 ≤2 行、依閱讀速度切分。不需要人聲分離。</p>
+        <div class="topmode-formats" aria-hidden="true">
+          <span class="fmt-chip">SRT</span><span class="fmt-chip">WebVTT</span>
+        </div>
+      </article>
+
+      <!-- Mode C: Clean Text -->
+      <article class="mode-card topmode-card">
+        <span class="topmode-emoji" aria-hidden="true">🧹</span>
+        <div class="mode-name" data-i18n="topmodes.c.name">清除字幕（Clean Text）</div>
+        <p class="mode-desc" data-i18n="topmodes.c.desc">框選你自己影片裡誤燒進去的固定位置文字，LaMa AI 修補逐格抹除，原始聲音原封保留。（固定位置；模型首次使用時下載。）</p>
+        <div class="topmode-formats" aria-hidden="true">
+          <span class="fmt-chip">MP4</span><span class="fmt-chip">LaMa</span>
+        </div>
+      </article>
+
+    </div><!-- /.modes-grid -->
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
      FEATURES
 ═══════════════════════════════════════════════════════════════════════════════ -->
 <section id="features" aria-labelledby="features-heading">
   <div class="section-wrap">
     <header class="section-header reveal">
-      <span class="eyebrow" data-i18n="feat.eyebrow">六大亮點</span>
+      <span class="eyebrow" data-i18n="feat.eyebrow">為什麼選它</span>
       <h2 id="features-heading" class="section-title" data-i18n="feat.title">準確、私密、隨時可用。</h2>
       <p class="section-sub" data-i18n="feat.sub">不需要帳號，不需要訂閱，不需要網路——開啟就能用。</p>
     </header>
 
     <div class="features-grid reveal">
 
-      <!-- 1: Two modes -->
-      <article class="feature-card">
-        <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <rect x="2" y="4" width="14" height="11" rx="2"/>
-          <polygon points="16,8 22,5 22,14 16,11"/>
-          <line x1="5" y1="19" x2="13" y2="19" stroke="var(--al-gold)" stroke-width="1.8"/>
-        </svg>
-        <div class="feature-name" data-i18n="feat.1.name">兩種模式・一個 App</div>
-        <p class="feature-desc" data-i18n="feat.1.desc">影片轉字幕（SRT / WebVTT）+ 歌曲轉逐字歌詞（LRC / ASS 卡拉 OK）。依檔案選模式，共用同一引擎。</p>
-      </article>
-
-      <!-- 2: Reference lyrics -->
-      <article class="feature-card">
-        <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M9 12l2 2 4-4"/>
-          <path d="M21 12c0 4.97-4.03 9-9 9S3 16.97 3 12 7.03 3 12 3s9 4.03 9 9z"/>
-          <path d="M3.6 9h16.8M3.6 15h16.8" stroke-width="1"/>
-        </svg>
-        <div class="feature-name" data-i18n="feat.2.name">參考歌詞→接近完美（歌詞模式）</div>
-        <p class="feature-desc" data-i18n="feat.2.desc">歌詞模式下貼入完整歌詞即啟動強制對齊（torchaudio MMS_FA + forced_align），準確度大幅超越純 ASR。</p>
-      </article>
-
-      <!-- 3: Video → subtitles -->
-      <article class="feature-card">
-        <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <rect x="2" y="4" width="20" height="16" rx="2"/>
-          <rect x="5" y="14" width="9" height="2.4" rx="1" fill="var(--al-gold)" stroke="none"/>
-          <rect x="16" y="14" width="3" height="2.4" rx="1" fill="var(--al-gold)" stroke="none"/>
-        </svg>
-        <div class="feature-name" data-i18n="feat.3.name">影片轉字幕・快速好用</div>
-        <p class="feature-desc" data-i18n="feat.3.desc">演講、Vlog、訪談、課程——丟檔即出乾淨字幕（SRT / WebVTT）。預設不做人聲分離，純語音更快。</p>
-      </article>
-
-      <!-- 4: Editor -->
-      <article class="feature-card">
-        <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <line x1="3"  y1="6"  x2="21" y2="6"/>
-          <line x1="3"  y1="10" x2="21" y2="10" stroke="var(--al-gold)" stroke-width="2"/>
-          <line x1="3"  y1="14" x2="16" y2="14" stroke-width="1"/>
-          <line x1="3"  y1="18" x2="14" y2="18" stroke-width="1"/>
-          <rect x="17" y="14" width="4" height="4" rx="1" fill="var(--al-gold)" stroke="none"/>
-        </svg>
-        <div class="feature-name" data-i18n="feat.4.name">逐字 QA 編輯介面</div>
-        <p class="feature-desc" data-i18n="feat.4.desc">黃金閱讀播放頭、信心色標、可拖拉邊界——用書本版面做 10 ms 精準修訂。</p>
-      </article>
-
-      <!-- 5: No discrete GPU required -->
+      <!-- 1: Runs on any laptop, no discrete GPU -->
       <article class="feature-card">
         <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <rect x="7" y="7" width="10" height="10" rx="1.5"/>
           <rect x="10" y="10" width="4" height="4" rx="0.5" fill="var(--al-gold)" stroke="none"/>
           <path d="M10 7V4M14 7V4M10 20v-3M14 20v-3M7 10H4M7 14H4M20 10h-3M20 14h-3"/>
         </svg>
-        <div class="feature-name" data-i18n="feat.5.name">免獨立顯卡・筆電也快</div>
-        <p class="feature-desc" data-i18n="feat.5.desc">預設自動挑選適合 CPU 的 int8 模型，Core Ultra / Ryzen 筆電也能快速轉字幕。有 NVIDIA GPU 只會更快。</p>
+        <div class="feature-name" data-i18n="feat.1.name">免獨立顯卡・筆電也能跑</div>
+        <p class="feature-desc" data-i18n="feat.1.desc">預設自動挑選適合 CPU 的 int8 模型，Intel Core Ultra / Ryzen 筆電也能順跑。偵測到 GPU 時自動使用，只會更快。</p>
       </article>
 
-      <!-- 6: Export formats -->
+      <!-- 2: No Python install needed -->
       <article class="feature-card">
         <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-          <polyline points="14,2 14,8 20,8"/>
-          <line x1="8"  y1="13" x2="16" y2="13"/>
-          <line x1="8"  y1="17" x2="13" y2="17"/>
-          <path d="M16 17 L18 19 L22 15" stroke="var(--al-green)" stroke-width="1.8"/>
+          <path d="M3 7l9-4 9 4v10l-9 4-9-4z"/>
+          <polyline points="3,7 12,11 21,7"/>
+          <line x1="12" y1="11" x2="12" y2="21"/>
+          <path d="M15.5 13.5l2 2 3.5-3.5" stroke="var(--al-green)" stroke-width="1.8"/>
         </svg>
-        <div class="feature-name" data-i18n="feat.6.name">匯出字幕與歌詞・多語支援</div>
-        <p class="feature-desc" data-i18n="feat.6.desc">字幕匯出 SRT / WebVTT；歌詞匯出 LRC / SRT / ASS 逐字卡拉 OK / JSON。中英日韓多語，CJK 字體自動選配。</p>
+        <div class="feature-name" data-i18n="feat.2.name">免裝 Python・開箱即用</div>
+        <p class="feature-desc" data-i18n="feat.2.desc">內建可攜式 Python，不必自己安裝任何執行環境。首次啟動會自動把一切準備就緒。</p>
+      </article>
+
+      <!-- 3: 100% local & private -->
+      <article class="feature-card">
+        <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z"/>
+          <path d="M9 12l2 2 4-4" stroke="var(--al-gold)"/>
+        </svg>
+        <div class="feature-name" data-i18n="feat.3.name">100% 本地・完全私密</div>
+        <p class="feature-desc" data-i18n="feat.3.desc">所有處理都在裝置上完成，不上傳任何檔案、無遙測、不連雲端。你的影片與歌詞永遠留在你的電腦。</p>
+      </article>
+
+      <!-- 4: Self-healing engine/models -->
+      <article class="feature-card">
+        <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21 12a9 9 0 1 1-3-6.7"/>
+          <polyline points="21 4 21 9 16 9"/>
+          <path d="M9 12l2 2 4-4" stroke="var(--al-gold)"/>
+        </svg>
+        <div class="feature-name" data-i18n="feat.4.name">自我修復・自動補齊</div>
+        <p class="feature-desc" data-i18n="feat.4.desc">每次啟動都會檢查自己的引擎與模型是否完整，只重新抓回缺少的部分——不必重裝整包。</p>
+      </article>
+
+      <!-- 5: Storage management -->
+      <article class="feature-card">
+        <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <ellipse cx="12" cy="5" rx="8" ry="3"/>
+          <path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/>
+          <path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/>
+        </svg>
+        <div class="feature-name" data-i18n="feat.5.name">儲存空間管理</div>
+        <p class="feature-desc" data-i18n="feat.5.desc">分層查看磁碟用量與剩餘空間：刪除單一模型、清空所有模型，或完整重設——把每一 GB 都看得清清楚楚。</p>
+      </article>
+
+      <!-- 6: In-app auto-update -->
+      <article class="feature-card">
+        <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="8,8 12,4 16,8"/>
+          <line x1="12" y1="4" x2="12" y2="15" stroke="var(--al-gold)" stroke-width="1.8"/>
+        </svg>
+        <div class="feature-name" data-i18n="feat.6.name">App 內自動更新</div>
+        <p class="feature-desc" data-i18n="feat.6.desc">新版本一鍵更新，並附上版本說明。介面支援中文 / English，Windows / macOS（Apple Silicon）/ Linux 皆可。</p>
       </article>
 
     </div><!-- /.features-grid -->
@@ -281,7 +327,7 @@
     <header class="section-header reveal">
       <span class="eyebrow" data-i18n="how.eyebrow">運作原理</span>
       <h2 id="how-heading" class="section-title" data-i18n="how.title">四步流水線，一氣呵成。</h2>
-      <p class="section-sub" data-i18n="how.sub">從音訊到時間軸，完全本地推理——模型一次下載，永久離線使用。</p>
+      <p class="section-sub" data-i18n="how.sub">這是歌詞模式的完整管道——從音訊到逐字時間軸，全程本地推理。模型一次下載，永久離線使用。（影片轉字幕只走語音辨識，更快；清字模式用 LaMa 逐格修補。）</p>
     </header>
 
     <!-- Pipeline stepper -->
@@ -586,6 +632,21 @@
               <span class="sr-only" data-i18n="cmp.no">否</span>
             </td>
           </tr>
+          <tr>
+            <td data-i18n="cmp.row.cleantext">清除燒錄字幕（AI 修補）</td>
+            <td class="col-highlight cell-yes">
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="var(--al-green)" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><polyline points="2,8 6,12 14,4"/></svg>
+              <span class="sr-only" data-i18n="cmp.yes">是</span>
+            </td>
+            <td class="cell-no">
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="var(--al-error)" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>
+              <span class="sr-only" data-i18n="cmp.no">否</span>
+            </td>
+            <td class="cell-no">
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="var(--al-error)" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>
+              <span class="sr-only" data-i18n="cmp.no">否</span>
+            </td>
+          </tr>
         </tbody>
       </table>
     </div><!-- /.compare-wrap -->
@@ -709,7 +770,7 @@
         </div>
         <span class="download-format" data-i18n="dl.exe.fmt">.EXE 安裝包</span>
         <div class="download-name" data-i18n="dl.exe.name">Windows 安裝精靈</div>
-        <p class="download-desc" data-i18n="dl.exe.desc">NSIS 封裝，雙擊安裝，含啟動精靈引導你安裝 Python 引擎與 AI 模型。</p>
+        <p class="download-desc" data-i18n="dl.exe.desc">NSIS 封裝，雙擊安裝。內建 Python，首次啟動自動備妥引擎並引導你下載 AI 模型。</p>
         <div class="download-cta" aria-hidden="true">
           <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="8" y1="2" x2="8" y2="11"/><polyline points="4,8 8,12 12,8"/></svg>
           <span data-i18n="dl.cta.download">下載</span>
@@ -751,7 +812,7 @@
         </div>
         <span class="download-format" data-i18n="dl.zip.fmt">.ZIP 免安裝</span>
         <div class="download-name" data-i18n="dl.zip.name">Windows Portable</div>
-        <p class="download-desc" data-i18n="dl.zip.desc">解壓即用，不寫入登錄機碼。仍需首次啟動精靈安裝 Python 引擎。</p>
+        <p class="download-desc" data-i18n="dl.zip.desc">解壓即用，不寫入登錄機碼。同樣內建 Python，首次啟動自動備妥引擎。</p>
         <div class="download-cta planned-cta" aria-hidden="true">
           <span data-i18n="dl.cta.soon">即將推出</span>
         </div>
@@ -803,7 +864,7 @@
 
     <div class="dl-footer reveal">
       <p class="download-note" data-i18n="dl.note">
-        <strong>首次啟動：</strong>安裝精靈會自動引導你安裝 Python 3.10–3.12 與 AI 模型（需要幾 GB 空間，僅下載一次）。
+        <strong>首次啟動：</strong>內建可攜式 Python，無需自行安裝。App 會自動備妥引擎並引導你下載所需 AI 模型（需要幾 GB 空間，僅下載一次）。
       </p>
       <p class="sysreq" data-i18n="dl.sysreq">需求：Windows 10/11 · 免獨立顯卡（NVIDIA GPU 可選，加速用）· 8 GB RAM · 10 GB 磁碟空間</p>
       <a class="download-all-releases"
@@ -1106,7 +1167,33 @@
           </svg>
         </button>
         <div class="faq-answer" id="faq-a6" role="region" aria-labelledby="faq-q6">
-          <div class="faq-answer-inner" data-i18n="faq.a6">Demucs htdemucs 約 320 MB，faster-whisper large-v3 約 3.1 GB，torchaudio MMS_FA 對齊模型約 1.2 GB。首次使用需一次性下載，之後完全離線。</div>
+          <div class="faq-answer-inner" data-i18n="faq.a6">Demucs htdemucs 約 320 MB，faster-whisper large-v3 約 3.1 GB，torchaudio MMS_FA 對齊模型約 1.2 GB，清字模式的 LaMa 修補模型約 200 MB。各模型在首次使用對應功能時才下載，之後完全離線。</div>
+        </div>
+      </div>
+
+      <!-- Q7 -->
+      <div class="faq-item" role="listitem">
+        <button class="faq-question" aria-expanded="false" aria-controls="faq-a7" id="faq-q7" type="button">
+          <span data-i18n="faq.q7">「清除字幕」能去掉什麼？</span>
+          <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="6,9 12,15 18,9"/>
+          </svg>
+        </button>
+        <div class="faq-answer" id="faq-a7" role="region" aria-labelledby="faq-q7">
+          <div class="faq-answer-inner" data-i18n="faq.a7">清字模式針對你自己影片中誤燒進去的「固定位置」文字（例如硬燒字幕、浮水印文字）。你框選一個區域，LaMa AI 會逐格修補抹除，並原封保留原始聲音。它僅支援固定位置的文字，不處理移動中的物件。LaMa 模型於首次使用時下載。</div>
+        </div>
+      </div>
+
+      <!-- Q8 -->
+      <div class="faq-item" role="listitem">
+        <button class="faq-question" aria-expanded="false" aria-controls="faq-a8" id="faq-q8" type="button">
+          <span data-i18n="faq.q8">需要先安裝 Python 嗎？目前是哪個版本？</span>
+          <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="6,9 12,15 18,9"/>
+          </svg>
+        </button>
+        <div class="faq-answer" id="faq-a8" role="region" aria-labelledby="faq-q8">
+          <div class="faq-answer-inner" data-i18n="faq.a8">不需要。App 內建可攜式 Python，首次啟動會自動把引擎與相依套件準備好——你不必自己裝任何東西。目前最新版本為 v0.1.3，可在 App 內一鍵自動更新。</div>
         </div>
       </div>
 
@@ -1115,6 +1202,8 @@
 </section>
 
 </main><!-- /#main -->
+
+<!-- SUPPORT/DONATE section goes here -->
 
 <!-- Back to top -->
 <a href="#" class="back-to-top" id="back-to-top" aria-label="Back to top">

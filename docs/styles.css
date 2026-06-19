@@ -761,6 +761,54 @@ a { color: inherit; text-decoration: none; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════
+   TOP-LEVEL MODES (the headline section)
+═══════════════════════════════════════════════════════════════════════════════ */
+#modes { border-top: 1px solid var(--al-hairline); }
+
+.topmode-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 30px 26px;
+  transition: border-color var(--al-dur-snap) var(--al-ease-snap),
+              background var(--al-dur-snap) var(--al-ease-snap);
+}
+
+.topmode-card:hover {
+  border-color: rgba(232, 195, 107, 0.28);
+  background: var(--al-surface-2);
+}
+
+.topmode-emoji {
+  font-size: 30px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.topmode-card .mode-name { font-size: 19px; margin-bottom: 2px; }
+
+.topmode-card .mode-desc { flex: 1; }
+
+.topmode-formats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.fmt-chip {
+  font-family: var(--al-font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--al-gold);
+  background: var(--al-gold-glow);
+  border: 1px solid rgba(232, 195, 107, 0.22);
+  padding: 3px 8px;
+  border-radius: var(--al-radius-chip);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
    DOWNLOAD
 ═══════════════════════════════════════════════════════════════════════════════ */
 #download {
