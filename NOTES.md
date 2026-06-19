@@ -1,15 +1,13 @@
-# Ai Caption v0.1.2
+# Ai Caption v0.1.3
 
-### New — 🧹 Clean Text mode
-A third top-level mode for **removing text you accidentally added to your own video** (a burned-in subtitle in the wrong spot, a mistyped title, a fixed corner caption):
+Robustness & housekeeping — Ai Caption now looks after its own engine and storage.
 
-- **Box it, AI erases it.** Drag a box over the fixed-position text; **LaMa** inpainting fills that region with background **every frame**, and the output keeps your **original audio**.
-- **100% local & GPU-accelerated** — NVIDIA NVENC / Intel QSV / CPU encode, no system ffmpeg or cloud needed. Falls back to a fast classical method if the AI model isn't available.
-- Before/after preview, then download the cleaned `.mp4`.
+### New
+- **🩺 Self-healing engine** — on launch the app checks that everything it needs is present (Python deps, CUDA, and each model). If something is **missing or was deleted**, it tells you exactly what, and **auto re-fetches only the missing pieces** — reusing whatever is already cached, never re-downloading what you already have.
+- **🗂️ Storage management** (Settings → 儲存空間) — see where your disk is going (engine, each model, caches) and free space in tiers: delete a single model · clear all models (keep the app) · full reset keeping your models · full reset wiping everything. Every option confirms first and shows how much it frees.
+- **🔔 Smarter update prompts** — when a new version is found, a tidy dialog now pops up with the **full release notes** and a one-click **Update now** (defer with Later).
 
-> v1 targets **fixed-position** text. Moving/animated text is a later step. The LaMa model (~196 MB) downloads automatically on first use.
-
-### Also
-- 🎵 Song lyrics and 🎬 Video → Subtitles modes are unchanged.
+### Unchanged
+- 🎵 Song lyrics · 🎬 Video → Subtitles · 🧹 Clean Text modes all as before.
 
 100% local — nothing is uploaded. MIT © 2026 Aries HongHuan Wu.
