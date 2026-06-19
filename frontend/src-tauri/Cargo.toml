@@ -1,7 +1,7 @@
 [package]
 name = "autolyrics"
-version = "0.1.0"
-description = "AutoLyrics — 本地端歌詞辨識與對齊引擎 (桌面殼層)"
+version = "0.1.1"
+description = "Ai Caption — local AI captioning + word-level lyrics engine (desktop shell)"
 authors = ["AutoLyrics"]
 license = "MIT"
 repository = ""
