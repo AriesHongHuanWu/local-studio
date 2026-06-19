@@ -132,6 +132,25 @@ impl BackendProcess {
             .unwrap_or(false)
     }
 
+    /// 追蹤中的後端 child 是否**仍在執行**(用 try_wait 探測,不阻塞)。
+    ///
+    /// 看門狗用它區分兩種「8756 沒在聽」的情況:
+    ///   - child 仍在跑(可能還在載入 torch/ML,首次 20-30s)→ **別重啟**,給它時間;
+    ///   - child 已結束(崩潰 / 被 OOM 殺掉)→ 才該重啟。
+    /// 探測失敗時保守回 true(當作還在跑),避免誤殺。
+    fn child_running(&self) -> bool {
+        if let Ok(mut guard) = self.child.lock() {
+            if let Some(child) = guard.as_mut() {
+                return match child.try_wait() {
+                    Ok(None) => true,
+                    Ok(Some(_)) => false,
+                    Err(_) => true,
+                };
+            }
+        }
+        false
+    }
+
     /// 終止後端子行程 (若仍在執行)。多次呼叫安全 (idempotent)。
     fn kill(&self) {
         if let Ok(mut guard) = self.child.lock() {
@@ -533,15 +552,37 @@ fn try_spawn_backend(app: &AppHandle) -> Option<SpawnedBackend> {
 /// 復原,使用者不必手動重開 App。`guarded_spawn_install` 內部已序列化 + 防搶埠,故與
 /// setup/restart 並行也安全;venv 尚未安裝時 spawn 會優雅 no-op(等安裝精靈跑完)。
 fn spawn_backend_watchdog(app: AppHandle) {
-    std::thread::spawn(move || loop {
-        std::thread::sleep(Duration::from_secs(8));
-        let state = app.state::<BackendProcess>();
-        if state.is_shutting_down() {
-            break;
-        }
-        if !backend_already_listening() {
-            log::warn!("watchdog:後端未在 8756 埠回應 —— 嘗試自動重啟。");
+    std::thread::spawn(move || {
+        // 啟動寬限:後端首次載入 torch / ML 相依可能要 20-30s。先給足時間再開始巡檢,
+        // 否則會在它還在載入時就誤判成「死掉」而 kill+重啟,造成永遠載不完的迴圈
+        // (v0.1.8~v0.1.10 的「Cannot reach backend」就是這個 bug)。
+        std::thread::sleep(Duration::from_secs(25));
+        // 上次「由看門狗觸發」的重啟時間 —— 用來做冷卻,避免任何情況下的重啟迴圈。
+        let mut last_restart: Option<std::time::Instant> = None;
+        loop {
+            std::thread::sleep(Duration::from_secs(10));
+            let state = app.state::<BackendProcess>();
+            if state.is_shutting_down() {
+                break;
+            }
+            if backend_already_listening() {
+                continue; // 健康:8756 有人在聽
+            }
+            if state.child_running() {
+                // 後端子行程還活著 —— 多半還在載入(尚未 bind 8756)。**別殺它**,給時間。
+                continue;
+            }
+            // 冷卻:剛重啟過就先別再重啟(40s),給新後端足夠時間載入 torch/ML;
+            // 這是 child_running 之外的第二道保險,確保絕不出現緊湊重啟迴圈。
+            if let Some(t) = last_restart {
+                if t.elapsed() < Duration::from_secs(40) {
+                    continue;
+                }
+            }
+            // 沒在聽、子行程也已結束(崩潰 / 被 OOM 殺掉)、且過了冷卻 → 才自動重啟。
+            log::warn!("watchdog:後端未在 8756 且子行程已結束 —— 自動重啟。");
             state.guarded_spawn_install(&app);
+            last_restart = Some(std::time::Instant::now());
         }
     });
 }

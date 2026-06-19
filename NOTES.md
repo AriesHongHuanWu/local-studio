@@ -1,12 +1,17 @@
-# Ai Caption v0.1.10
+# Ai Caption v0.1.11
 
-Small fix: the version number shown in Settings is now correct.
+Critical fix — "Cannot reach local backend" caused by the auto-restart watchdog.
 
 ### Fixed
-- **🔢 Correct version in Settings** — the "目前版本 / Current version" under **應用程式更新** (and the version in **本機保證**) was showing a stale placeholder (`0.1.0-local`) instead of the actually-installed version. It now reads the real app version, so "已是最新版本" and the version number agree. (The update check itself was always correct — only the displayed number was wrong.)
+- **🚑 "Cannot reach local backend" loop** — the backend watchdog added in v0.1.8 was too aggressive: the engine takes 20–30 s to load (PyTorch + the ML stack), but the watchdog declared it "dead" after 8 s and **killed it mid-load, then restarted it** — so it could never finish booting, and the app stayed permanently offline. The watchdog now:
+  - waits a **startup grace period** before checking at all,
+  - only restarts when the engine process has **actually exited** (not while it's still loading),
+  - and applies a **restart cooldown** so it can never get into a restart loop again.
+
+If you were stuck on "Cannot reach backend", **update to v0.1.11** and it will boot normally. (This was a regression in v0.1.8–v0.1.10; sorry about that.)
 
 ### Unchanged
-- 100% local. All v0.1.9 accuracy + features as before.
+- 100% local. All v0.1.10 features as before.
 
 If you'd like to support development: ☕ [Ko-fi](https://ko-fi.com/arieswu) · [PayPal](https://paypal.me/Arieshonghuan) · [GitHub Sponsors](https://github.com/sponsors/AriesHongHuanWu).
 
