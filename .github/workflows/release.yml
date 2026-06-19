@@ -1,6 +1,6 @@
 name: Release
 
-# Build + sign AutoLyrics on native runners for every OS and publish ONE
+# Build + sign Ai Caption on native runners for every OS and publish ONE
 # GitHub Release containing all platforms' installers AND a single, merged,
 # multi-platform updater `latest.json`.
 #
@@ -154,6 +154,27 @@ jobs:
         run: npm install
         working-directory: frontend
 
+      # Portable Python — bundle a python-build-standalone interpreter into the
+      # installer so END USERS don't need to install Python. Staged into
+      # frontend/src-tauri/resources/python/ (gitignored) and picked up by the
+      # tauri.conf.json `resources/python/**/*` glob. If this step is ever
+      # removed, the app still works — it falls back to system Python.
+      - name: Fetch portable Python (Windows)
+        if: startsWith(matrix.platform, 'windows')
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./scripts/fetch-portable-python.ps1
+
+      - name: Fetch portable Python (macOS / Linux)
+        if: ${{ !startsWith(matrix.platform, 'windows') }}
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          chmod +x scripts/fetch-portable-python.sh
+          ./scripts/fetch-portable-python.sh
+
       - name: Build, sign, and publish (tauri-action)
         uses: tauri-apps/tauri-action@v0
         env:
@@ -200,8 +221,8 @@ jobs:
           projectPath: frontend
           # Reuse the pushed tag (or the dispatch input). Don't use __VERSION__.
           tagName: ${{ github.event.inputs.tag || github.ref_name }}
-          releaseName: "AutoLyrics ${{ github.event.inputs.tag || github.ref_name }}"
-          releaseBody: "See assets to download and install. AutoLyrics sets up its local Python engine (and CUDA torch where an NVIDIA GPU is present) on first launch."
+          releaseName: "Ai Caption ${{ github.event.inputs.tag || github.ref_name }}"
+          releaseBody: "See assets to download and install. Ai Caption sets up its local Python engine (and CUDA torch where an NVIDIA GPU is present) on first launch."
           # Draft so all 4 legs can write the same release/latest.json without a
           # half-finished release going live. PUBLISH manually once every leg is
           # green — publishing flips it to "Latest", which the updater endpoint
@@ -242,7 +263,7 @@ jobs:
             echo ""
             echo "**Before it goes live, do this manually:**"
             echo ""
-            echo "1. Open **Releases** → the draft **AutoLyrics $tag**."
+            echo "1. Open **Releases** → the draft **Ai Caption $tag**."
             echo "2. Confirm \`latest.json\` has all platform keys (\`windows-x86_64\`, \`darwin-aarch64\`, \`darwin-x86_64\`, \`linux-x86_64\`), each with a non-empty \`signature\`."
             echo "3. **Publish** the draft (this flips it to *Latest*, so \`releases/latest/download/latest.json\` starts serving it)."
             echo ""

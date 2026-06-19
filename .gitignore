@@ -39,6 +39,13 @@ package-lock.json
 frontend/src-tauri/target/
 frontend/src-tauri/gen/
 
+# ── Bundled portable Python (fetched at build time, tens of MB) ──
+# scripts/fetch-portable-python.* populates this; CI runs it before `tauri build`.
+# Keep the .gitkeep so the tauri.conf resource glob always matches on a fresh
+# clone (build never breaks); ignore the heavy interpreter itself.
+frontend/src-tauri/resources/python/*
+!frontend/src-tauri/resources/python/.gitkeep
+
 # ── Updater signing keys (SECRET — never commit) ────────────────
 .tauri-keys/
 *.key

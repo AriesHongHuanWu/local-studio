@@ -167,6 +167,41 @@ fn venv_python(backend_dir: &Path) -> PathBuf {
     }
 }
 
+/// 解析**內建可攜 Python**(python-build-standalone,隨安裝包一起 bundle)的執行檔路徑。
+///
+/// 目的:讓使用者**免自行安裝 Python** —— 首次安裝精靈用它來建立 `.venv`,
+/// 之後 pip 灌 torch/requirements 都進那個 venv。找不到(未 fetch / 未 bundle /
+/// 從原始碼建置時沒跑 fetch 腳本)時回 `None`,呼叫端會優雅退回系統 Python,
+/// 行為與舊版完全一致,故此特性是純加成、零回歸風險。
+///
+/// 路徑布局(python-build-standalone `install_only` 解壓後固定如此):
+///   Windows: `<resource>/python/python.exe`
+///   其他   : `<resource>/python/bin/python3`
+fn embedded_python(app: &AppHandle) -> Option<PathBuf> {
+    let rel: &Path = if cfg!(windows) {
+        Path::new("python/python.exe")
+    } else {
+        Path::new("python/bin/python3")
+    };
+
+    // (1) 發佈:安裝包 bundle 的 Resource 目錄。
+    if let Ok(res) = app.path().resolve(rel, BaseDirectory::Resource) {
+        if res.is_file() {
+            return Some(res);
+        }
+    }
+
+    // (2) DEV / 原始碼建置:`src-tauri/resources/python/…`(fetch 腳本就地產生)。
+    let dev = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("resources")
+        .join(rel);
+    if dev.is_file() {
+        return Some(dev);
+    }
+
+    None
+}
+
 /// DEV repo 後端目錄 (相對 `src-tauri` = `CARGO_MANIFEST_DIR` 的 `../../backend`)。
 ///
 /// `src-tauri` 在 `frontend/` 底下,`backend` 是其 sibling:
@@ -483,9 +518,18 @@ fn backend_status(app: AppHandle) -> BackendStatus {
         .map(|d| d.join("app.py").exists())
         .unwrap_or(false);
 
-    let (python_found, python_cmd, python_version) = match find_system_python() {
-        Some(p) => (true, Some(p.argv.join(" ")), Some(p.version)),
-        None => (false, None, None),
+    // 內建可攜 Python 存在即視為「Python 就緒」(使用者免自行安裝);否則探測系統 Python。
+    let (python_found, python_cmd, python_version) = if let Some(embedded) = embedded_python(&app) {
+        (
+            true,
+            Some(format!("(內建可攜) {}", embedded.display())),
+            Some("portable".to_string()),
+        )
+    } else {
+        match find_system_python() {
+            Some(p) => (true, Some(p.argv.join(" ")), Some(p.version)),
+            None => (false, None, None),
+        }
     };
 
     BackendStatus {
@@ -641,15 +685,24 @@ fn run_setup(app: &AppHandle) -> Result<PathBuf, String> {
     ensure_work_source(app, &backend_dir, is_work)
         .map_err(|e| format!("複製後端原始碼失敗: {}", e))?;
 
-    // (b) 找系統 python。
-    let py = find_system_python().ok_or_else(|| {
-        "找不到系統 Python。請先安裝 Python 3.10–3.12 並勾選 Add to PATH。".to_string()
-    })?;
-    emit_progress(
-        app,
-        6.0,
-        format!("使用 Python: {} ({})", py.argv.join(" "), py.version),
-    );
+    // (b) 取得用來建立 venv 的 Python。優先用**內建可攜 Python**(隨安裝包 bundle,
+    //     使用者免自行安裝);找不到才退回系統 Python(從原始碼建置 / 未 fetch 時)。
+    let py_argv: Vec<String> = if let Some(embedded) = embedded_python(app) {
+        emit_progress(app, 6.0, format!("使用內建可攜 Python:{}", embedded.display()));
+        vec![embedded.to_string_lossy().into_owned()]
+    } else {
+        let py = find_system_python().ok_or_else(|| {
+            "找不到內建可攜 Python,系統也沒有 Python。請改用含可攜 Python 的安裝包,\
+             或安裝 Python 3.10–3.12 並勾選 Add to PATH。"
+                .to_string()
+        })?;
+        emit_progress(
+            app,
+            6.0,
+            format!("使用系統 Python:{} ({})", py.argv.join(" "), py.version),
+        );
+        py.argv
+    };
 
     let venv_dir = backend_dir.join(".venv");
     let vpython = venv_python(&backend_dir);
@@ -659,7 +712,7 @@ fn run_setup(app: &AppHandle) -> Result<PathBuf, String> {
         emit_progress(app, 12.0, "偵測到既有 .venv,沿用。");
     } else {
         emit_progress(app, 8.0, "建立虛擬環境 .venv …");
-        let (exe, rest) = py.argv.split_first().unwrap();
+        let (exe, rest) = py_argv.split_first().unwrap();
         let mut cmd = Command::new(exe);
         cmd.args(rest)
             .arg("-m")

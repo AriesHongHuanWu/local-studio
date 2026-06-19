@@ -14,6 +14,11 @@
 #        > Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 # =============================================================================
 
+# -PythonExe:直接指定要用的 Python 執行檔(略過系統 PATH 搜尋)。供「可攜 Python」
+#   使用 —— 例如先跑 scripts\fetch-portable-python.ps1,再:
+#     .\install.ps1 -PythonExe ..\frontend\src-tauri\resources\python\python.exe
+param([string]$PythonExe = "")
+
 $ErrorActionPreference = "Stop"
 
 # 切換到腳本所在目錄(backend\),確保相對路徑正確
@@ -41,16 +46,28 @@ function Find-Python {
     return $null
 }
 
-$PyCmd = Find-Python
-if (-not $PyCmd) {
-    Write-Host "✗ 找不到 Python。請先安裝 Python 3.10 - 3.12,並勾選 Add to PATH。" -ForegroundColor Red
-    Write-Host "  下載: https://www.python.org/downloads/" -ForegroundColor Yellow
-    exit 1
+if ($PythonExe) {
+    # 明確指定的 Python(可攜 Python 路徑,可能含空白)—— 不做 PATH 搜尋、不切分空白。
+    if (-not (Test-Path $PythonExe)) {
+        Write-Host "✗ 指定的 -PythonExe 不存在: $PythonExe" -ForegroundColor Red
+        exit 1
+    }
+    $PyExe  = (Resolve-Path $PythonExe).Path
+    $PyArgs = @()
+    Write-Host "✓ 使用指定 Python(可攜): $PyExe" -ForegroundColor Green
+} else {
+    $PyCmd = Find-Python
+    if (-not $PyCmd) {
+        Write-Host "✗ 找不到 Python。請先安裝 Python 3.10 - 3.12,並勾選 Add to PATH。" -ForegroundColor Red
+        Write-Host "  (或先跑 scripts\fetch-portable-python.ps1 再用 -PythonExe 指定可攜 Python)" -ForegroundColor Yellow
+        Write-Host "  下載: https://www.python.org/downloads/" -ForegroundColor Yellow
+        exit 1
+    }
+    Write-Host "✓ 使用 Python: $PyCmd" -ForegroundColor Green
+    $PyParts = $PyCmd.Split(" ")
+    $PyExe   = $PyParts[0]
+    $PyArgs  = @($PyParts[1..($PyParts.Length-1)])
 }
-Write-Host "✓ 使用 Python: $PyCmd" -ForegroundColor Green
-$PyParts = $PyCmd.Split(" ")
-$PyExe   = $PyParts[0]
-$PyArgs  = @($PyParts[1..($PyParts.Length-1)])
 
 # --- 建立虛擬環境 -----------------------------------------------------------
 $VenvDir = Join-Path $ScriptDir ".venv"

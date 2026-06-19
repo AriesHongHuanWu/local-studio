@@ -1,0 +1,7 @@
+# This directory is populated at build time by scripts/fetch-portable-python.{ps1,sh}
+# with a python-build-standalone interpreter, which is bundled into the installer so
+# end users do NOT need to install Python themselves ("portable Python").
+#
+# The interpreter is intentionally NOT committed (tens of MB). Run the fetch script
+# before `tauri build` (CI does this automatically). If this folder contains only
+# this .gitkeep at build time, the app gracefully falls back to system Python.
