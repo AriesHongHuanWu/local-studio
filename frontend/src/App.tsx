@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AppFrame } from './components/shell/AppFrame';
 import { TabRail } from './components/shell/TabRail';
 import { StatusStrip } from './components/shell/StatusStrip';
@@ -17,7 +17,7 @@ import { useModels } from './state/useModels';
 import { useSetup } from './state/useSetup';
 import { useHealth } from './state/useHealth';
 import { SetupScreen } from './components/setup/SetupScreen';
-import { makeT, useI18n } from './i18n';
+import { makeT, useI18n, useT } from './i18n';
 import { UpdateBanner } from './components/update/UpdateBanner';
 import { HealthBanner } from './components/health/HealthBanner';
 
@@ -29,6 +29,7 @@ const HEALTH_RECHECK_MS = 60_000;
 const COLLAPSE_WIDTH = 900;
 
 export default function App() {
+  const t = useT();
   const [tab, setTab] = useState<TabKey>('transcribe');
   const [collapsed, setCollapsed] = useState(false);
 
@@ -55,14 +56,14 @@ export default function App() {
   const loadModels = useModels((s) => s.load);
   const disposeModels = useModels((s) => s.disposeAll);
   const refreshHealth = useHealth((s) => s.refresh);
+  const online = useMeta((s) => s.online);
+  const bootFailed = useMeta((s) => s.bootFailed);
+  const forceReinstall = useSetup((s) => s.forceReinstall);
+  // Bumped by the "retry" affordance to re-arm the reconnect loop after a timeout.
+  const [reconnectNonce, setReconnectNonce] = useState(0);
 
-  // Load /api/meta and model list once at startup (fall back gracefully if offline).
   // Tear down any in-flight model-download polling timers on unmount.
-  useEffect(() => {
-    void loadMeta();
-    void loadModels();
-    return () => disposeModels();
-  }, [loadMeta, loadModels, disposeModels]);
+  useEffect(() => () => disposeModels(), [disposeModels]);
 
   // Environment health-check: only meaningful AFTER first-run setup (when a
   // venv exists). Refresh once we're past the SetupScreen gate, then poll on
@@ -70,43 +71,55 @@ export default function App() {
   // (The SetupScreen handles the no-venv first-run; HealthBanner is for after.)
   const pastSetup = !(inTauri && needsSetup);
   useEffect(() => {
-    if (!pastSetup) return;
+    // Only health-check once the engine is actually up — otherwise /api/health
+    // fails during the boot window and the HealthBanner would flash alarms.
+    if (!pastSetup || !online) return;
     void refreshHealth();
     const id = window.setInterval(() => void refreshHealth(), HEALTH_RECHECK_MS);
     return () => window.clearInterval(id);
-  }, [pastSetup, refreshHealth]);
+  }, [pastSetup, online, refreshHealth]);
 
-  // After first-run setup finishes (needsSetup true→false), the Rust shell spawns
-  // uvicorn, which needs several seconds to bind 127.0.0.1:8756 (torch/whisper
-  // import time). The startup load above already failed (no venv yet), so without
-  // an active re-poll the app stays stuck OFFLINE and the model picker never
-  // appears. Watch the transition and poll meta+models until online (~30s cap).
-  const prevNeedsSetup = useRef(needsSetup);
+  // Reconnect loop — the heart of the calm-boot UX. The engine needs ~20-30s to
+  // bind 127.0.0.1:8756 (it imports torch/whisper at startup), so a single load
+  // on launch fails and would leave the app stuck OFFLINE forever. This polls
+  // /api/meta until the engine answers, covering BOTH a normal launch AND the
+  // moment first-run setup completes (pastSetup flips true). While polling it
+  // marks `connecting` (UI shows "starting engine…" not "OFFLINE"); if the engine
+  // never answers within the deadline it marks `bootFailed` so a repair
+  // affordance can appear (the broken/incomplete-venv recovery path).
   useEffect(() => {
-    const was = prevNeedsSetup.current;
-    prevNeedsSetup.current = needsSetup;
-    // Only act on a real true→false transition (setup just completed).
-    if (!(was && !needsSetup)) return;
-
+    if (!pastSetup) return; // during the first-run wizard the engine isn't up yet by design
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const deadline = Date.now() + 30_000;
-
+    const deadline = Date.now() + 60_000;
+    const m = useMeta.getState();
+    if (!m.online) {
+      m.setConnecting(true);
+      m.setBootFailed(false);
+    }
     const poll = async () => {
       if (cancelled) return;
       await loadMeta();
       await loadModels();
       if (cancelled) return;
-      if (useMeta.getState().online || Date.now() >= deadline) return;
+      const s = useMeta.getState();
+      if (s.online) {
+        s.setConnecting(false);
+        return;
+      }
+      if (Date.now() >= deadline) {
+        s.setConnecting(false);
+        s.setBootFailed(true);
+        return;
+      }
       timer = setTimeout(poll, 1_500);
     };
     void poll();
-
     return () => {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [needsSetup, loadMeta, loadModels]);
+  }, [pastSetup, loadMeta, loadModels, reconnectNonce]);
 
   // Collapse the rail on narrow windows.
   useEffect(() => {
@@ -160,9 +173,38 @@ export default function App() {
           between the titlebar and the content area. Only renders in Tauri
           when an update is found (or during download / on error). */}
       <UpdateBanner />
+      {/* Boot-failed recovery: the engine exists on disk but never answered
+          within the reconnect deadline (a broken/incomplete venv, or a stuck
+          process). Offer a calm retry + a repair that re-runs setup. */}
+      {bootFailed && !online && (
+        <div className="al-bootfail" role="alert">
+          <span className="al-bootfail__msg">{t('common.boot.failed')}</span>
+          <div className="al-bootfail__actions">
+            <button
+              type="button"
+              className="al-bootfail__btn"
+              onClick={() => {
+                useMeta.getState().setBootFailed(false);
+                setReconnectNonce((n) => n + 1);
+              }}
+            >
+              {t('common.boot.retry')}
+            </button>
+            {inTauri && (
+              <button
+                type="button"
+                className="al-bootfail__btn al-bootfail__btn--primary"
+                onClick={() => forceReinstall()}
+              >
+                {t('common.boot.repair')}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
       {/* Health banner: warns + self-heals when a dep/model is missing AFTER
-          first-run setup. Self-hides when everything required is present. */}
-      <HealthBanner />
+          first-run setup. Gated on `online` so it never flashes during boot. */}
+      {online && <HealthBanner />}
       <div className="al-shell">
         <TabRail active={tab} onChange={setTab} collapsed={collapsed} />
         <div className="al-main">

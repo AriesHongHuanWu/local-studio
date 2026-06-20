@@ -85,7 +85,7 @@ export function UpdateSettingsRow() {
           variant="ghost"
           size="sm"
           icon={isChecking ? <Loader size={13} className="al-spinner-icon" /> : <RefreshCw size={13} />}
-          onClick={() => void checkNow()}
+          onClick={() => void checkNow(true)}
           disabled={isChecking || isDownloading}
           aria-label={t('update.checkNow')}
           title={t('update.checkNow')}

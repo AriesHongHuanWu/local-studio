@@ -143,3 +143,36 @@ ol {
     scroll-behavior: auto !important;
   }
 }
+
+/* ── boot-failed recovery banner (calm, not alarming) ── */
+.al-bootfail {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  background: var(--al-amber-glow, rgba(224, 162, 78, 0.14));
+  border-bottom: 1px solid var(--al-hairline-strong);
+  color: var(--al-ink);
+  font-size: var(--al-text-sm);
+}
+.al-bootfail__msg { flex: 1 1 auto; min-width: 180px; }
+.al-bootfail__actions { display: flex; gap: 8px; flex: 0 0 auto; }
+.al-bootfail__btn {
+  font: inherit;
+  font-size: var(--al-text-sm);
+  padding: 5px 12px;
+  border-radius: var(--al-radius-ctrl);
+  border: 1px solid var(--al-hairline-strong);
+  background: var(--al-surface);
+  color: var(--al-ink-dim);
+  cursor: pointer;
+}
+.al-bootfail__btn:hover { color: var(--al-ink); border-color: var(--al-ink-faint); }
+.al-bootfail__btn--primary {
+  background: var(--al-gold);
+  border-color: var(--al-gold);
+  color: var(--al-bg);
+  font-weight: 600;
+}
+.al-bootfail__btn--primary:hover { background: var(--al-gold-soft); color: var(--al-bg); }

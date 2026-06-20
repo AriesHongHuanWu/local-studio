@@ -131,7 +131,7 @@ export function UpdateBanner() {
           <div className="al-update-modal__actions">
             {status === 'error' ? (
               <>
-                <Button variant="primary" size="md" icon={<RefreshCw size={14} />} onClick={() => void checkNow()}>
+                <Button variant="primary" size="md" icon={<RefreshCw size={14} />} onClick={() => void checkNow(true)}>
                   {t('update.retry')}
                 </Button>
                 <Button variant="ghost" size="md" onClick={dismiss}>

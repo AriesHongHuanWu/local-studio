@@ -1,22 +1,18 @@
-# Local Studio v0.1.17
+# Local Studio v0.1.18
 
-🎚️ **A real mastering studio.** The 母帶 mode now runs a full pro signal chain that *listens to the song and adjusts* — and you can watch every stage work, live.
+Smoother startup and a calmer, friendlier interface — fewer scary messages, better recovery.
 
-### New — Pro signal chain (not a template)
-- **3-band multiband compressor** (Linkwitz-Riley crossover) — controls low / mid / high dynamics independently, the way real mastering does, instead of one blunt bus compressor.
-- **Auto de-esser** — finds and tames harsh sibilance (5–9 kHz) *only when it spikes*, so vocals stay smooth without going dull.
-- **Harmonic saturation** — subtle analog-style warmth and glue for a more "alive", human feel (2× oversampled, no harshness).
-- **Second corrective-EQ pass** — closes the residual the first pass leaves, so detected problems are genuinely *resolved*. The after-master score jumps much higher than before, and a clean master can now read 85–95 — while an over-compressed or near-mono master honestly still reads low.
+### Fixed — startup & connection
+- **No more "OFFLINE / Cannot reach backend" on launch.** The local engine needs ~20–30s to start (it loads the AI runtime), and the app used to flash a red **OFFLINE** badge — and, worse, could stay stuck offline even after the engine came up. Now it shows a calm **"啟動引擎中… / Starting engine…"** and **auto-reconnects** the moment the engine is ready.
+- **Stuck-offline bug fixed** — the app now keeps retrying the connection on a normal launch (previously it only retried right after first-run setup), so it reliably comes online on its own.
+- **Engine recovery** — if the engine genuinely fails to start (e.g. a half-finished install), you now get a friendly banner with **Retry** and **Reinstall engine** instead of a silent dead state.
 
-### New — Watch it work
-- **🔊 Live spectrum analyzer** — a real-time frequency display that moves with the music as it plays, on both the original and the mastered track.
-- **🎯 Stereo imager (goniometer)** — see your song's stereo field, with phase-correlation and per-band width meters.
-- **📉 Gain-reduction meters** — per band, so you can *see* exactly how much each part of the spectrum is being compressed.
-- **🔗 Signal-chain view** — EQ → De-ess → Multiband → Saturate → Width → EQ → Limit, lit up by whatever actually ran on your song.
+### Fixed — fewer false alarms
+- **No update-check pop-ups** — the "check for updates" failure modal no longer appears on launch when you're offline. Update errors now only show if *you* press "Check for updates."
+- **No health warnings during boot** — the components/health banner no longer flashes while the engine is still starting; it only appears for a genuine, actionable issue once everything is up.
 
-### Notes
-- **Auto** mode drives the whole chain automatically (scaled by the Natural↔Strong dial). Specific genres + the manual sliders behave exactly as before — the new stages are opt-in.
-- Live visuals only animate while audio is playing (saves battery).
+### Unchanged
+- All v0.1.15–v0.1.17 features (device-aware setup, intelligent auto-mastering, the pro chain + live visualizations) work exactly as before.
 
 Support: ☕ [Ko-fi](https://ko-fi.com/arieswu) · [PayPal](https://paypal.me/Arieshonghuan) · [GitHub Sponsors](https://github.com/sponsors/AriesHongHuanWu).
 

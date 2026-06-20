@@ -78,6 +78,12 @@ interface SetupState {
   runSetup: () => Promise<void>;
   /** Release any active event listeners (call from SetupScreen unmount). */
   cancelSetup: () => void;
+  /**
+   * Force the setup wizard to show again (recovery for a broken/incomplete
+   * engine that exists on disk but won't start). Re-running setup re-installs
+   * torch + requirements even when the venv already exists, repairing it.
+   */
+  forceReinstall: () => void;
 }
 
 // ── Detect Tauri at module-load time (synchronous, safe in browser too) ─────
@@ -191,5 +197,11 @@ export const useSetup = create<SetupState>((set, get) => ({
       u();
       set({ _unlisten: null });
     }
+  },
+
+  // ── forceReinstall ──────────────────────────────────────────────────────
+  forceReinstall: () => {
+    if (!IN_TAURI) return;
+    set({ needsSetup: true, done: false, error: null, running: false, progressLines: [], pct: 0 });
   },
 }));

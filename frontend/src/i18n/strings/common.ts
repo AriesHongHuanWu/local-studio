@@ -236,6 +236,19 @@ export const common: Record<string, Entry> = {
     zh: '後端未連線 — UI 為離線預覽',
     en: 'Backend not reachable — UI in offline preview',
   },
+  'common.status.starting': { zh: '啟動引擎中…', en: 'Starting engine…' },
+  'common.status.startingTitle': {
+    zh: '正在啟動本機引擎(首次載入需 20–30 秒)',
+    en: 'Starting the local engine (20–30s on first load)',
+  },
+
+  // Boot-failed recovery (engine on disk but didn't answer in time)
+  'common.boot.failed': {
+    zh: '引擎啟動較久或未能就緒 —— 可再等一下並重試,或重新安裝引擎。',
+    en: 'The engine is taking long or did not start — wait and retry, or reinstall it.',
+  },
+  'common.boot.retry': { zh: '重試連線', en: 'Retry' },
+  'common.boot.repair': { zh: '重新安裝引擎', en: 'Reinstall engine' },
 
   // ── Language toggle ──
   'common.lang.aria': { zh: '介面語言', en: 'Interface language' },

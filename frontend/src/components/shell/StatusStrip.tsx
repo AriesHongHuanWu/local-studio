@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Cpu, WifiOff } from 'lucide-react';
+import { Cpu, WifiOff, Loader2 } from 'lucide-react';
 import { Badge } from '../primitives';
 import { useMeta } from '../../state/useMeta';
 import type { TabKey } from './tabs';
@@ -16,6 +16,7 @@ export interface StatusStripProps {
 export function StatusStrip({ activeTab }: StatusStripProps) {
   const meta = useMeta((s) => s.meta);
   const online = useMeta((s) => s.online);
+  const connecting = useMeta((s) => s.connecting);
   const t = useT();
   const tab = TABS.find((t2) => t2.key === activeTab);
 
@@ -48,6 +49,10 @@ export function StatusStrip({ activeTab }: StatusStripProps) {
               <Cpu size={12} strokeWidth={2} /> CPU
             </Badge>
           )
+        ) : connecting ? (
+          <Badge tone="neutral" title={t('common.status.startingTitle')}>
+            <Loader2 size={12} strokeWidth={2} className="al-spin" /> {t('common.status.starting')}
+          </Badge>
         ) : (
           <Badge tone="neutral" title={t('common.status.offlineTitle')}>
             <WifiOff size={12} strokeWidth={2} /> {t('common.status.offline')}

@@ -70,8 +70,12 @@ interface UpdaterState {
   /** User clicked "Later" — suppress the banner for this session. */
   dismissed: boolean;
 
-  /** Run a fresh update check. No-op when not in Tauri. */
-  checkNow: () => Promise<void>;
+  /** Run a fresh update check. No-op when not in Tauri.
+   *  `manual` = the user explicitly asked (Settings button) → surface errors.
+   *  Auto-check on startup passes manual=false → failures stay silent (a
+   *  local-first app must never pop a "check failed" modal just because the
+   *  machine is offline). */
+  checkNow: (manual?: boolean) => Promise<void>;
   /** Download the pending update and relaunch. Requires available=true. */
   downloadAndInstall: () => Promise<void>;
   /** Hide the update banner for this session (does NOT cancel a download). */
@@ -93,7 +97,7 @@ export const useUpdater = create<UpdaterState>((set, get) => ({
   _update: null,
 
   // ── checkNow ────────────────────────────────────────────────────────────────
-  checkNow: async () => {
+  checkNow: async (manual = false) => {
     if (!IN_TAURI) return;
     // Prevent concurrent checks.
     if (get().status === 'checking') return;
@@ -121,7 +125,13 @@ export const useUpdater = create<UpdaterState>((set, get) => ({
     } catch (err) {
       // Network offline, signature mismatch, or server error.
       const msg = err instanceof Error ? err.message : String(err);
-      // Distinguish "network unreachable" from other errors for i18n.
+      // Auto-check (startup): NEVER surface — just go quiet. A local-first app
+      // popping "update check failed" on every offline launch is pure noise.
+      if (!manual) {
+        set({ status: 'idle', error: null });
+        return;
+      }
+      // Manual check: surface, distinguishing "network unreachable" for i18n.
       const isOffline =
         msg.toLowerCase().includes('network') ||
         msg.toLowerCase().includes('connect') ||
