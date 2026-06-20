@@ -344,6 +344,39 @@
 .al-mb__cross { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 11px; color: var(--al-ink-faint); }
 .al-mb__crossrange { flex: 1; accent-color: var(--al-accent); }
 .al-mb__crossval { font-family: var(--al-font-mono); color: var(--al-ink); min-width: 56px; text-align: right; }
+
+/* EQ automation lanes (Pro) */
+.al-auto { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.al-auto__lanes { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.al-auto__lanechip {
+  display: inline-flex; align-items: center; gap: 5px; font-size: 11px; padding: 3px 9px;
+  border-radius: 999px; cursor: pointer; border: 1px solid var(--al-hairline);
+  background: transparent; color: var(--al-ink-faint);
+}
+.al-auto__lanechip--on { border-color: var(--al-ink); color: var(--al-ink); background: var(--al-surface-2, var(--al-surface)); }
+.al-auto__dot { width: 8px; height: 8px; border-radius: 999px; flex: none; }
+.al-auto__add {
+  font-size: 11px; padding: 3px 9px; border-radius: 999px; cursor: pointer;
+  border: 1px dashed var(--al-hairline); background: transparent; color: var(--al-ink-faint);
+}
+.al-auto__add:disabled { opacity: 0.4; cursor: not-allowed; }
+.al-auto__svg {
+  width: 100%; height: auto; touch-action: none; user-select: none;
+  background: var(--al-surface-2, var(--al-surface)); border: 1px solid var(--al-hairline);
+  border-radius: var(--al-radius-panel);
+}
+.al-auto__grid { stroke: var(--al-hairline); stroke-width: 0.5; }
+.al-auto__zero { stroke: var(--al-ink-faint); stroke-width: 0.8; stroke-dasharray: 2 2; opacity: 0.6; }
+.al-auto__axis { fill: var(--al-ink-faint); font-size: 9px; font-family: var(--al-font-mono); }
+.al-auto__line { fill: none; stroke-width: 2; }
+.al-auto__line--dim { opacity: 0.3; stroke-width: 1.4; }
+.al-auto__node { cursor: grab; stroke: var(--al-surface); stroke-width: 1.5; }
+.al-auto__node:active { cursor: grabbing; }
+.al-auto__ctrls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.al-auto__field { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--al-ink-faint); }
+.al-auto__field input { width: 64px; padding: 3px 6px; border: 1px solid var(--al-hairline); border-radius: 6px; background: var(--al-surface); color: var(--al-ink); font-family: var(--al-font-mono); font-size: 11px; }
+.al-auto__tip { font-size: 11px; color: var(--al-ink-faint); }
+.al-auto__rm { margin-left: auto; font-size: 11px; padding: 3px 9px; border-radius: 6px; cursor: pointer; border: 1px solid var(--al-hairline); background: transparent; color: var(--al-ink-faint); }
 .al-master__slider {
   display: grid;
   grid-template-columns: 6.5em 1fr 4.5em;

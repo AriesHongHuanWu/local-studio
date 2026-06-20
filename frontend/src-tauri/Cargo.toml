@@ -1,6 +1,6 @@
 [package]
 name = "autolyrics"
-version = "0.1.26"
+version = "0.1.27"
 description = "Ai Caption — local AI captioning + word-level lyrics engine (desktop shell)"
 authors = ["AutoLyrics"]
 license = "MIT"

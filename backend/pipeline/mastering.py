@@ -1724,6 +1724,59 @@ def _adaptive_eq(data: "np.ndarray", sr: int, *, genre: str = "auto", strength: 
 
 
 # =========================================================================== #
+# EQ Automation lanes(Pro)—— 像 DAW:使用者自己畫「某頻段的增益隨時間變化曲線」。
+# 每條 lane = 一個 bell(freq/Q)+ 一串 (時間秒, 增益dB) 控制點;逐樣本內插增益,用
+# zero-phase 帶通並聯套上(out += (g(t)-1)*band)。= 全手動版的適應性 EQ。
+# =========================================================================== #
+def _automation_eq(data: "np.ndarray", sr: int, lanes: list) -> tuple["np.ndarray", dict]:
+    """套用使用者畫的 EQ automation 曲線。lanes=[{freq,q,points:[[t_norm,gain_db],...]}]。
+    時間用『正規化 0..1 全曲長度』(與前端/解碼長度無關 → 點永遠落在正確位置)。每條 lane 是
+    真正的 RBJ peaking bell(min-phase,中心增益準確、Q 對應正確);增益在 dB 域內插(畫直線 =
+    聽到等斜率 dB ramp)。out += (g(t)-1)*unit_bell_band。"""
+    n = data.shape[0]
+    if n < 16 or not lanes:
+        return data, {"active": False, "lanes": []}
+    out = data.copy()
+    idx = None  # 逐樣本索引(延遲配置:全平/空時不浪費記憶體)
+    ref_db = 12.0
+    ref_lin = 10.0 ** (ref_db / 20.0)
+    meters: list = []
+    for lane in lanes:
+        try:
+            f0 = float(lane.get("freq", 1000.0))
+            q = float(lane.get("q", 1.0) or 1.0)
+            pts = [(float(p[0]), float(p[1])) for p in lane.get("points", [])
+                   if isinstance(p, (list, tuple)) and len(p) >= 2]
+            pts = [p for p in pts if np.isfinite(p[0]) and np.isfinite(p[1])]
+            if len(pts) < 1:
+                continue
+            pts.sort(key=lambda p: p[0])
+            ts = np.clip([p[0] for p in pts], 0.0, 1.0) * (n - 1)  # 正規化 → 樣本位置
+            gs = np.clip([p[1] for p in pts], -24.0, 24.0)
+            if float(np.max(np.abs(gs))) < 0.05:
+                continue  # 整條平的(沒畫)→ 跳過
+            for i in range(1, ts.shape[0]):  # 確保嚴格遞增(同時間點 → 乾淨垂直步階)
+                ts[i] = max(ts[i], ts[i - 1] + 1e-6)
+            if idx is None:
+                idx = np.arange(n)
+            g_db = np.interp(idx, ts, gs)  # 在 dB 域內插(WYSIWYG:畫直線=等斜率 dB)
+            g_lin = 10.0 ** (g_db / 20.0)
+            # 單位 bell band:min-phase RBJ peak(中心增益 = 畫的 dB、Q 正確、無 filtfilt 平方失真)
+            bb, ba = _biquad("peak", sr, f0, ref_db, q)
+            band = np.empty_like(data)
+            for ch in range(data.shape[1]):
+                band[:, ch] = (sps.lfilter(bb, ba, data[:, ch]) - data[:, ch]) / (ref_lin - 1.0)
+            out += (g_lin[:, None] - 1.0) * band
+            meters.append({"freq": round(f0), "min_db": round(float(np.min(gs)), 1),
+                           "max_db": round(float(np.max(gs)), 1), "points": len(pts)})
+        except Exception:
+            logger.warning("EQ automation lane 失敗(略過)", exc_info=True)
+    if not np.isfinite(out).all():
+        out = np.nan_to_num(out, nan=0.0, posinf=0.0, neginf=0.0)
+    return out, {"active": len(meters) > 0, "lanes": meters}
+
+
+# =========================================================================== #
 # 全參數 EQ(Pro)—— 無限段,每段可選類型/頻率/增益/Q,**每段相位(min/linear)**
 # + **每段聲道路由(stereo/mid/side/L/R)**。線性相位用 _match_eq 同套 FIR 法。
 # =========================================================================== #
@@ -1839,6 +1892,7 @@ def master(
     dynamic_eq: Optional[list] = None,
     param_eq: Optional[list] = None,
     adaptive_eq: Optional[bool] = None,
+    automation_eq: Optional[list] = None,
     matched_output_path: Optional[str] = None,
     analyze_result: bool = True,
     progress: Optional[ProgressFn] = None,
@@ -1931,6 +1985,17 @@ def master(
                 stages.append("adaptive_eq")
         except Exception:
             logger.warning("適應性 EQ 失敗(略過,不影響輸出)", exc_info=True)
+
+    # 1b3) EQ Automation lanes(Pro 手動):使用者畫的「某頻段增益隨時間變化」曲線
+    if automation_eq:
+        _emit(progress, 29.0, "EQ Automation")
+        try:
+            data, aut_m = _automation_eq(data, sr, automation_eq)
+            if aut_m.get("active"):
+                meters["automation_eq"] = aut_m
+                stages.append("automation_eq")
+        except Exception:
+            logger.warning("EQ automation 失敗(略過,不影響輸出)", exc_info=True)
 
     # 1c) 動態 EQ:只在某頻段「突出」時才修(透明)。手動 dynamic_eq 清單 > auto 依問題放置。
     deq_meters: list = []
@@ -2138,6 +2203,7 @@ def master(
             "deEss": round(deess_amount, 3),
             "dynamicEq": len(deq_meters),
             "adaptiveEq": "adaptive_eq" in stages,
+            "automationEq": "automation_eq" in stages,
             "multiband": "multiband" in meters,
             "saturation": round(sat_amount, 3),
             "residualEq": bool(do_residual),

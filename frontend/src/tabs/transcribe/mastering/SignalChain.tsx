@@ -15,6 +15,7 @@ interface Props {
 const STAGES: { id: string; key: string; match: (s: string[]) => boolean; conditional?: boolean }[] = [
   { id: 'eq', key: 'master.chain.eq', match: (s) => s.includes('corrective_eq') || s.includes('genre_eq') || s.includes('reference_match') },
   { id: 'adaptive', key: 'master.chain.adaptive', match: (s) => s.includes('adaptive_eq'), conditional: true },
+  { id: 'automation', key: 'master.chain.automation', match: (s) => s.includes('automation_eq'), conditional: true },
   { id: 'dyneq', key: 'master.chain.dyneq', match: (s) => s.includes('dynamic_eq') },
   { id: 'deess', key: 'master.chain.deess', match: (s) => s.includes('de_ess') },
   { id: 'multiband', key: 'master.chain.multiband', match: (s) => s.includes('multiband') || s.includes('compress') },

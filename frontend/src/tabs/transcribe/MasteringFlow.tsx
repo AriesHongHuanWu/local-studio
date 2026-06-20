@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Disc3, UploadCloud, Sparkles, Download, Loader2, Music2,
-  SlidersHorizontal, ChevronRight, ChevronDown, Gauge, Wand2, Waves,
+  SlidersHorizontal, ChevronRight, ChevronDown, Gauge, Wand2, Waves, Activity,
 } from 'lucide-react';
 import { Button, Eyebrow } from '../../components/primitives';
 import { createMasterJob, getMasterJob, masterResultUrl, masterMatchedUrl, matchAudio, analyzeMaster } from '../../api/master';
@@ -20,6 +20,7 @@ import { ABCompare } from './mastering/ABCompare';
 import { ParametricEQ, newBand } from './mastering/ParametricEQ';
 import { toBackendBands } from './mastering/eqMath';
 import { MultibandPanel, defaultMultiband, toBackendMultiband, type MbBand } from './mastering/MultibandPanel';
+import { AutomationLanes, newLane, toBackendAutomation, hasAutomation, type AutoLane } from './mastering/AutomationLanes';
 import type { EqBand } from './mastering/eqMath';
 import { saveBinaryUrl } from '../export/saveFile';
 import type { MasterLoudness, MasterMeta, MasterAnalysis } from '../../api/master';
@@ -68,6 +69,9 @@ export function MasteringFlow() {
   const [mbEnabled, setMbEnabled] = useState(false);
   const [mbCrossovers, setMbCrossovers] = useState<number[]>(() => defaultMultiband().crossovers);
   const [mbBands, setMbBands] = useState<MbBand[]>(() => defaultMultiband().bands);
+  const [autoEnabled, setAutoEnabled] = useState(false);
+  const [autoLanes, setAutoLanes] = useState<AutoLane[]>([]);
+  const [audioDuration, setAudioDuration] = useState(0);
 
   // Section macro-dynamics (−1 balance ↔ +1 punch) + advanced manual params.
   const [dynamics, setDynamics] = useState(0);
@@ -152,10 +156,18 @@ export function MasteringFlow() {
   const pickFile = useCallback((f: File | null) => {
     if (!f) return;
     setFile(f);
+    const url = URL.createObjectURL(f);
     setSrcUrl((old) => {
       if (old) URL.revokeObjectURL(old);
-      return URL.createObjectURL(f);
+      return url;
     });
+    // capture duration for the automation-lane timeline (decode metadata only).
+    const probe = new Audio();
+    probe.preload = 'metadata';
+    probe.onloadedmetadata = () => {
+      if (Number.isFinite(probe.duration) && probe.duration > 0) setAudioDuration(probe.duration);
+    };
+    probe.src = url;
     setPhase('idle');
     setResultUrl(null);
     setMatchedUrl(null);
@@ -239,6 +251,7 @@ export function MasteringFlow() {
           paramEq: proMode && paramBands.some((b) => b.enabled) ? JSON.stringify(toBackendBands(paramBands)) : undefined,
           adaptiveEq: adaptiveEq || undefined,
           multibandManual: proMode && mbEnabled ? toBackendMultiband(mbCrossovers, mbBands) : undefined,
+          automationEq: proMode && autoEnabled && hasAutomation(autoLanes) ? toBackendAutomation(autoLanes) : undefined,
         });
         if (stoppedRef.current) return;
         pollTimer.current = setTimeout(() => void poll(jobId), POLL_MS);
@@ -250,7 +263,7 @@ export function MasteringFlow() {
         setPhase('error');
       }
     })();
-  }, [file, genre, loudness, reference, dynamics, width, eqBass, eqLowMid, eqPresence, eqAir, compScale, ceiling, autoStrength, proMode, paramBands, adaptiveEq, mbEnabled, mbCrossovers, mbBands, poll, t]);
+  }, [file, genre, loudness, reference, dynamics, width, eqBass, eqLowMid, eqPresence, eqAir, compScale, ceiling, autoStrength, proMode, paramBands, adaptiveEq, mbEnabled, mbCrossovers, mbBands, autoEnabled, autoLanes, poll, t]);
 
   // Three-way A/B/C: upload an external master → loudness-match it to OUR
   // master's output LUFS → add as the C source for an original/ours/theirs shoot-out.
@@ -544,6 +557,32 @@ export function MasteringFlow() {
                 crossovers={mbCrossovers}
                 bands={mbBands}
                 onChange={(c, b) => { setMbCrossovers(c); setMbBands(b); }}
+                disabled={running}
+              />
+            )}
+
+            <label className="al-master__switch al-master__switch--mt">
+              <input
+                type="checkbox"
+                checked={autoEnabled}
+                onChange={(e) => {
+                  setAutoEnabled(e.target.checked);
+                  if (e.target.checked && autoLanes.length === 0) setAutoLanes([newLane()]);
+                }}
+                disabled={running}
+              />
+              <span className="al-master__switchbody">
+                <span className="al-master__switchtitle">
+                  <Activity size={14} /> {t('master.auto.toggle')}
+                </span>
+                <span className="al-master__switchhint">{t('master.auto.hint')}</span>
+              </span>
+            </label>
+            {autoEnabled && (
+              <AutomationLanes
+                lanes={autoLanes}
+                duration={audioDuration || 60}
+                onChange={setAutoLanes}
                 disabled={running}
               />
             )}

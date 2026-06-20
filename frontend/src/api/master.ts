@@ -154,6 +154,7 @@ export interface ChainState {
   deEss: number;
   dynamicEq?: number;
   adaptiveEq?: boolean;
+  automationEq?: boolean;
   multiband: boolean;
   saturation: number;
   residualEq: boolean;
@@ -231,6 +232,8 @@ export interface MasterAdvanced {
   adaptiveEq?: boolean;
   /** Pro mode: JSON-stringified manual multiband {crossovers, bands}. */
   multibandManual?: string;
+  /** Pro mode: JSON-stringified EQ automation lanes [{freq,q,points}]. */
+  automationEq?: string;
 }
 
 /** POST /api/master — spawn the background mastering job. */
@@ -270,6 +273,7 @@ export async function createMasterJob(
     if (a.paramEq) form.append('paramEq', a.paramEq);
     if (a.adaptiveEq) form.append('adaptiveEq', 'true');
     if (a.multibandManual) form.append('multibandManual', a.multibandManual);
+    if (a.automationEq) form.append('automationEq', a.automationEq);
   }
 
   let res: Response;

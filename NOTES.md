@@ -1,22 +1,23 @@
-# Local Studio v0.1.26
+# Local Studio v0.1.27
 
-🎛️ **Pro: a manual multiband compressor** — the deep dynamics control a mastering engineer reaches for, built to a quality bar (true band isolation, stable stereo image) after a full adversarial review.
+🎚️ **Pro: EQ automation lanes** — draw how a band's gain moves across the whole song, DAW-style. Built to a precise WYSIWYG standard after a 14-finding adversarial review.
 
-### New — Pro: manual multiband
-Open **Pro 進階** → **手動多頻段壓縮** and you get a real multiband compressor:
-- **2–5 custom bands** — drag the crossover frequencies (default 3: 20–120 / 120–2k / 2k–20k Hz).
-- **Each band, independently**: threshold · ratio · attack · release · knee · makeup.
-- **Per-band Mid/Side** — compress the centre and the sides as one (linked, so the stereo image stays rock-steady under compression) and set each band's **stereo width**.
-- **Per-band bypass**, and a live gain-reduction meter per band on the result.
-- It replaces the automatic compressor when enabled.
+### New — Pro: EQ automation
+Open **Pro 進階** → **EQ 自動化曲線(手動畫)** and draw EQ moves over time:
+- **Timeline editor** — x = song time, y = gain (±12 dB). Lift the highs in the chorus, dip the lows in the bridge, anything you can draw.
+- **Drag points, click to add, double-click to remove.** Each lane is a true bell with its own frequency and Q. Up to 5 colour-coded lanes.
+- Runs as its own stage in the signal chain; what you draw is what you hear.
 
-Under the hood: phase-coherent Linkwitz-Riley crossovers with true 24 dB/oct skirts (a kick stays in the low band instead of bleeding up and pumping the high band), a soft-knee detector with real, separate attack/release ballistics, and linked Mid/Side gain so width never breathes.
+It's the manual companion to the automatic Adaptive EQ — one rides the song for you, the other lets you draw every move yourself.
 
-### Quality pass (adversarial review)
-This shipped only after a 12-finding adversarial review of the DSP. Fixes applied: true band isolation (was leaking ~1 dB of bass into every band, now −81 dB), linked Mid/Side compression (was pumping the stereo image), and full input sanitization so no parameter value can ever produce a silent or corrupt master.
+### Precision (adversarial review)
+This shipped after a 14-finding review of the DSP + editor. The important fixes:
+- **What you draw is what plays.** Each lane is now a real RBJ peaking bell (exact centre gain, correct Q), and the gain ramps are interpolated in dB — so a straight line you draw from 0 to +6 dB is heard as a straight 0→+6 dB ramp, not a curved one.
+- **Times are song-relative**, so a move you place at the chorus lands at the chorus regardless of the file format or how the browser reports its length.
+- Plus: safe at any sample rate, clean handling of overlapping points, and tighter point editing (no stray points from near-misses).
 
 ### Unchanged
-- The adaptive EQ, Pro parametric EQ, auto mode, dynamic EQ, A/B + three-way comparison, and download all work as before.
+- The manual multiband, adaptive EQ, Pro parametric EQ, auto mode, A/B + three-way comparison, and download all work as before.
 
 Support: ☕ [Ko-fi](https://ko-fi.com/arieswu) · [PayPal](https://paypal.me/Arieshonghuan) · [GitHub Sponsors](https://github.com/sponsors/AriesHongHuanWu).
 
