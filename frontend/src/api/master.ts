@@ -305,6 +305,30 @@ export function masterMatchedUrl(jobId: string): string {
   return apiUrl(`/api/master/jobs/${encodeURIComponent(jobId)}/result/matched`);
 }
 
+/** POST /api/master/match — loudness-match any upload (e.g. an external master)
+ *  to targetLufs, returning the matched WAV blob (for a fair 3-way A/B/C). */
+export async function matchAudio(audio: File, targetLufs: number, signal?: AbortSignal): Promise<Blob> {
+  const form = new FormData();
+  form.append('audio', audio, audio.name);
+  form.append('targetLufs', String(targetLufs));
+  let res: Response;
+  try {
+    res = await fetch(apiUrl('/api/master/match'), { method: 'POST', body: form, signal });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'network error';
+    throw new ApiError(`Cannot reach local backend at ${API_BASE} (${message})`, 0, true);
+  }
+  if (!res.ok) {
+    let detail = res.statusText;
+    try {
+      const d = (await res.json()) as { detail?: string };
+      detail = d.detail ?? detail;
+    } catch { /* keep */ }
+    throw new ApiError(detail || `Match failed (${res.status})`, res.status);
+  }
+  return await res.blob();
+}
+
 /** POST /api/master/analyze — intelligent diagnosis of a mix (no rendering). */
 export async function analyzeMaster(
   audio: File,

@@ -14,7 +14,7 @@
    ────────────────────────────────────────────────────────────────── */
 
 import { save } from '@tauri-apps/plugin-dialog';
-import { writeTextFile } from '@tauri-apps/plugin-fs';
+import { writeTextFile, writeFile } from '@tauri-apps/plugin-fs';
 import type { ExportFormat } from '../../api/types';
 
 interface TauriInternalsWindow {
@@ -60,6 +60,34 @@ export async function saveText(
     return { kind: 'tauri', path };
   }
   downloadBlob(new Blob([text], { type: mime }), filename);
+  return { kind: 'download' };
+}
+
+/**
+ * Save a binary file FETCHED from a backend URL (e.g. the mastered WAV).
+ *
+ * The naive `<a href=resultUrl download>` fails in the desktop app: the
+ * result URL is cross-origin (the local backend on :8756), and webviews
+ * ignore the `download` attribute for cross-origin hrefs AND block
+ * navigating to external http — so nothing saves. We instead `fetch` the
+ * bytes (fetch is not blocked) and write them via the Tauri save dialog
+ * (binary `writeFile`) or a same-origin blob download in the browser.
+ */
+export async function saveBinaryUrl(
+  url: string,
+  filename: string,
+  filter: { name: string; extensions: string[] } = { name: 'WAV audio', extensions: ['wav'] },
+): Promise<SaveOutcome> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`download failed (${res.status})`);
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  if (hasTauri()) {
+    const path = await save({ defaultPath: filename, filters: [filter] });
+    if (!path) return { kind: 'cancelled' };
+    await writeFile(path, bytes);
+    return { kind: 'tauri', path };
+  }
+  downloadBlob(new Blob([bytes], { type: res.headers.get('content-type') || 'application/octet-stream' }), filename);
   return { kind: 'download' };
 }
 

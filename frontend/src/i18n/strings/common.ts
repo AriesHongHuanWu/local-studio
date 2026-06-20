@@ -141,9 +141,21 @@ export const common: Record<string, Entry> = {
   },
 
   // Loudness-matched A/B compare
+  'master.dlSaved': { zh: '已儲存 ✓', en: 'Saved ✓' },
+  'master.dlDone': { zh: '已下載 ✓', en: 'Downloaded ✓' },
+  'master.dlFail': { zh: '下載失敗,請重試', en: 'Download failed — try again' },
+
   'master.ab.label': { zh: 'A/B 對比', en: 'A/B compare' },
   'master.ab.mastered': { zh: 'A · 母帶後', en: 'A · Mastered' },
   'master.ab.original': { zh: 'B · 原曲', en: 'B · Original' },
+  'master.ab.external': { zh: 'C · 外部母帶', en: 'C · External' },
+  'master.ab.extUpload': { zh: '＋ 上傳外部母帶做三方比較', en: '+ Add an external master to compare' },
+  'master.ab.matching': { zh: '匹配響度中…', en: 'Loudness-matching…' },
+  'master.ab.extFail': { zh: '匹配失敗,請重試', en: 'Match failed — try again' },
+  'master.ab.why3': {
+    zh: '三方等響度比較:A 本軟體母帶 · B 原曲 · C 外部母帶(如 LANDR/Ozone)。全部調到同響度,直接聽哪個音色與動態最好 —— 公平、不被音量騙。空白鍵播放,A/B/C 鍵切換。',
+    en: 'Three-way at equal loudness: A this app · B original · C external (e.g. LANDR/Ozone). All matched to the same loudness so you judge tone & dynamics directly. Space to play; A/B/C to switch.',
+  },
   'master.ab.play': { zh: '播放', en: 'Play' },
   'master.ab.pause': { zh: '暫停', en: 'Pause' },
   'master.ab.seek': { zh: '進度', en: 'Seek' },

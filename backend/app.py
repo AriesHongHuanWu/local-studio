@@ -2097,6 +2097,46 @@ async def api_master_analyze(
     return JSONResponse(result)
 
 
+@app.post("/api/master/match")
+async def api_master_match(
+    audio: UploadFile = File(...),
+    targetLufs: float = Form(...),
+) -> Response:
+    """把上傳的音檔(例如外部母帶)調到 targetLufs(只縮放),回傳匹配後的 wav 位元組。
+    供前端做「原始 / 本軟體母帶 / 外部母帶」三方等響度 A/B/C 比較。"""
+    _require_mastering()
+    try:
+        tl = max(-30.0, min(0.0, float(targetLufs)))
+    except (TypeError, ValueError):
+        tl = -14.0
+    uid = uuid.uuid4().hex
+    tin = UPLOAD_DIR / f"matchin_{uid}{_safe_upload_suffix(audio.filename)}"
+    tout = UPLOAD_DIR / f"matchout_{uid}.wav"
+    try:
+        data = await audio.read()
+        if not data:
+            raise HTTPException(status_code=400, detail="上傳的音檔是空的")
+        tin.write_bytes(data)
+        if mastering is None:  # pragma: no cover
+            raise RuntimeError("pipeline.mastering 不可用")
+        await run_in_threadpool(mastering.match_loudness, str(tin), str(tout), tl)
+        wav_bytes = tout.read_bytes()
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001
+        logger.error("響度匹配失敗:%s\n%s", e, traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"響度匹配失敗:{e}") from e
+    finally:
+        await audio.close()
+        for p in (tin, tout):
+            try:
+                if p.exists():
+                    p.unlink()
+            except OSError:
+                pass
+    return Response(content=wav_bytes, media_type="audio/wav")
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 靜態前端:掛在 "/" (html=True → 自動服務 index.html / SPA fallback)
 # 注意:必須在所有 /api/* 路由「之後」掛載,否則 "/" 會吃掉 API。

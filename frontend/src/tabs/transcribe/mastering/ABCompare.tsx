@@ -1,9 +1,9 @@
 /* ──────────────────────────────────────────────────────────────────
-   ABCompare — honest, loudness-matched before/after A/B.
+   ABCompare — honest, loudness-matched A/B (and optional 3-way A/B/C).
 
-   Two native <audio> elements (A = mastered, B = original) play in sync;
-   exactly one is audible at a time via the .muted property. The B source
-   swaps between the loudness-matched render and the raw original.
+   A = this app's master, B = original, C = an EXTERNAL master (uploaded,
+   loudness-matched on the backend) for an original-vs-ours-vs-theirs
+   shoot-out. All sources play in sync; exactly one is audible via .muted.
 
    NO Web Audio: createMediaElementSource reroutes the element's output
    into a (suspended) AudioContext and silences playback — the bug we are
@@ -16,13 +16,14 @@ import { Disc3, Play, Pause } from 'lucide-react';
 import { useT } from '../../../i18n';
 
 interface Props {
-  masteredUrl: string; // A
-  matchedUrl: string;  // B when loudness-matched ON
-  rawUrl: string;      // B when loudness-matched OFF
+  masteredUrl: string;       // A
+  matchedUrl: string;        // B when loudness-matched ON
+  rawUrl: string;            // B when loudness-matched OFF
   hasMatched: boolean;
+  externalUrl?: string | null; // C (already loudness-matched), optional
 }
 
-type Side = 'A' | 'B';
+type Side = 'A' | 'B' | 'C';
 const SYNC_TOL = 0.04; // 40 ms — below A/B perceptual fusion; avoids re-seek stutter
 
 function fmt(t: number): string {
@@ -32,10 +33,11 @@ function fmt(t: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-export function ABCompare({ masteredUrl, matchedUrl, rawUrl, hasMatched }: Props) {
+export function ABCompare({ masteredUrl, matchedUrl, rawUrl, hasMatched, externalUrl }: Props) {
   const t = useT();
-  const aRef = useRef<HTMLAudioElement>(null); // mastered
-  const bRef = useRef<HTMLAudioElement>(null); // original (matched or raw)
+  const aRef = useRef<HTMLAudioElement>(null); // mastered (clock)
+  const bRef = useRef<HTMLAudioElement>(null); // original
+  const cRef = useRef<HTMLAudioElement>(null); // external
 
   const [side, setSide] = useState<Side>('A');
   const [matched, setMatched] = useState(hasMatched);
@@ -44,58 +46,61 @@ export function ABCompare({ masteredUrl, matchedUrl, rawUrl, hasMatched }: Props
   const [dur, setDur] = useState(0);
 
   const bSrc = matched && hasMatched ? matchedUrl : rawUrl;
+  const hasC = !!externalUrl;
 
-  // Audibility: exactly one element unmuted. Re-assert after a src swap
-  // (a fresh element starts unmuted).
+  const followers = useCallback(() => [bRef.current, cRef.current].filter(Boolean) as HTMLAudioElement[], []);
+
+  // Audibility: exactly one element unmuted. Re-assert after any src swap.
   useEffect(() => {
-    const a = aRef.current;
-    const b = bRef.current;
-    if (a) a.muted = side !== 'A';
-    if (b) b.muted = side !== 'B';
-  }, [side, bSrc]);
+    if (aRef.current) aRef.current.muted = side !== 'A';
+    if (bRef.current) bRef.current.muted = side !== 'B';
+    if (cRef.current) cRef.current.muted = side !== 'C';
+  }, [side, bSrc, externalUrl]);
 
-  // A drives the clock; nudge B only when it drifts (re-seeking every frame ticks).
+  // If C disappears (cleared) while selected, fall back to A.
+  useEffect(() => {
+    if (!hasC && side === 'C') setSide('A');
+  }, [hasC, side]);
+
+  // A drives the clock; nudge followers only on drift > tol.
   const onATime = useCallback(() => {
     const a = aRef.current;
-    const b = bRef.current;
     if (!a) return;
     setTime(a.currentTime);
-    if (b && Math.abs(b.currentTime - a.currentTime) > SYNC_TOL) {
-      b.currentTime = a.currentTime;
+    for (const f of followers()) {
+      if (Math.abs(f.currentTime - a.currentTime) > SYNC_TOL) f.currentTime = a.currentTime;
     }
-  }, []);
+  }, [followers]);
 
   const play = useCallback(async () => {
     const a = aRef.current;
-    const b = bRef.current;
-    if (!a || !b) return;
-    if (Math.abs(b.currentTime - a.currentTime) > SYNC_TOL) b.currentTime = a.currentTime;
-    await Promise.allSettled([a.play(), b.play()]);
+    if (!a) return;
+    for (const f of followers()) {
+      if (Math.abs(f.currentTime - a.currentTime) > SYNC_TOL) f.currentTime = a.currentTime;
+    }
+    await Promise.allSettled([a.play(), ...followers().map((f) => f.play())]);
     setPlaying(true);
-  }, []);
+  }, [followers]);
 
   const pause = useCallback(() => {
     aRef.current?.pause();
-    bRef.current?.pause();
+    followers().forEach((f) => f.pause());
     setPlaying(false);
-  }, []);
+  }, [followers]);
 
   const seek = useCallback((tt: number) => {
-    const a = aRef.current;
-    const b = bRef.current;
-    if (a) a.currentTime = tt;
-    if (b) b.currentTime = tt;
+    if (aRef.current) aRef.current.currentTime = tt;
+    followers().forEach((f) => { f.currentTime = tt; });
     setTime(tt);
-  }, []);
+  }, [followers]);
 
-  // When B's source swaps (matched ↔ raw), realign to A + restore mute + resume.
-  const onBLoaded = useCallback(() => {
+  // When a follower's source (re)loads, realign + restore mute + resume.
+  const onFollowerLoaded = useCallback((el: HTMLAudioElement | null, isSide: Side) => {
     const a = aRef.current;
-    const b = bRef.current;
-    if (!a || !b) return;
-    b.currentTime = a.currentTime;
-    b.muted = side !== 'B';
-    if (playing) void b.play();
+    if (!a || !el) return;
+    el.currentTime = a.currentTime;
+    el.muted = side !== isSide;
+    if (playing) void el.play();
   }, [side, playing]);
 
   return (
@@ -108,6 +113,7 @@ export function ABCompare({ masteredUrl, matchedUrl, rawUrl, hasMatched }: Props
         if (e.key === ' ') { e.preventDefault(); void (playing ? pause() : play()); }
         else if (e.key === 'a' || e.key === 'A') setSide('A');
         else if (e.key === 'b' || e.key === 'B') setSide('B');
+        else if ((e.key === 'c' || e.key === 'C') && hasC) setSide('C');
       }}
     >
       {/* eslint-disable jsx-a11y/media-has-caption */}
@@ -119,7 +125,10 @@ export function ABCompare({ masteredUrl, matchedUrl, rawUrl, hasMatched }: Props
         onEnded={() => setPlaying(false)}
         preload="auto"
       />
-      <audio ref={bRef} src={bSrc} onLoadedMetadata={onBLoaded} preload="auto" />
+      <audio ref={bRef} src={bSrc} onLoadedMetadata={() => onFollowerLoaded(bRef.current, 'B')} preload="auto" />
+      {hasC && (
+        <audio ref={cRef} src={externalUrl!} onLoadedMetadata={() => onFollowerLoaded(cRef.current, 'C')} preload="auto" />
+      )}
       {/* eslint-enable jsx-a11y/media-has-caption */}
 
       <div className="al-ab__transport">
@@ -145,6 +154,12 @@ export function ABCompare({ masteredUrl, matchedUrl, rawUrl, hasMatched }: Props
                   aria-pressed={side === 'B'} onClick={() => setSide('B')}>
             {t('master.ab.original')}
           </button>
+          {hasC && (
+            <button type="button" className={`al-ab__btn${side === 'C' ? ' al-ab__btn--on' : ''}`}
+                    aria-pressed={side === 'C'} onClick={() => setSide('C')}>
+              {t('master.ab.external')}
+            </button>
+          )}
         </div>
         {hasMatched && (
           <label className="al-ab__lmatch">
@@ -154,7 +169,7 @@ export function ABCompare({ masteredUrl, matchedUrl, rawUrl, hasMatched }: Props
           </label>
         )}
       </div>
-      <p className="al-ab__why">{t('master.ab.why')}</p>
+      <p className="al-ab__why">{hasC ? t('master.ab.why3') : t('master.ab.why')}</p>
     </div>
   );
 }

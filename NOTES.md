@@ -1,18 +1,20 @@
-# Local Studio v0.1.21
+# Local Studio v0.1.22
 
-🎚️ **Dynamic EQ** — tames harshness and resonance *only when it spikes*, so masters sound cleaner and more natural.
+⬇️ **Fix: download your master.** Plus a **three-way A/B/C** so you can put this app head-to-head with LANDR / Ozone / any external master.
 
-### New — Dynamic EQ
-- A frequency-selective dynamic processor: it watches specific bands and **only acts when they jump out** (a sudden harsh 2–5 kHz, a boomy low note, a muddy resonance), then relaxes — leaving everything else untouched. That's far more transparent than a static EQ cut that's always on.
-- **Auto mode places it for you:** when the analysis detects *harsh / muddy / boomy*, it adds a dynamic-EQ band that calms the peaks (scaled by the Natural↔Strong dial). Verified on real audio — it cut a resonant burst by ~44% while leaving the quiet passages essentially unchanged.
-- It shows up in the **signal chain** view and gets its own **gain-reduction meter** so you can see it working.
+### Fixed
+- **Download works again.** The "download master" button silently did nothing in the desktop app — it tried a cross-origin link the webview blocks. It now **fetches the WAV and saves it** through a proper save dialog (or a browser download), with a "Saved ✓" confirmation.
+
+### New — three-way comparison (original vs ours vs theirs)
+- In the result, **add an external master** (drag in a version mastered by LANDR, Ozone, or anyone) and compare **A · this app · B · original · C · external** — all at the **same loudness**, so you judge tone and dynamics, not volume.
+- One click (or the **A / B / C** keys) switches instantly, in sync, at the same position. The external file is loudness-matched for you automatically.
+- This is the honest way to prove a master: hear all three side by side, level-matched.
 
 ### Notes
-- This is the same kind of tool pro suites (e.g. Ozone) use to clean up a mix without dulling it — now local, free, and automatic.
-- Manual per-band dynamic-EQ control arrives with the upcoming Pro mode.
+- All comparison playback is native audio (no Web Audio) — verified to actually play.
 
 ### Unchanged
-- All prior mastering features + the v0.1.20 loudness-matched A/B + the v0.1.19 sound fix work as before.
+- All prior mastering (multiband, de-esser, saturation, dynamic EQ, 2nd-pass EQ) + the loudness-matched A/B work as before.
 
 Support: ☕ [Ko-fi](https://ko-fi.com/arieswu) · [PayPal](https://paypal.me/Arieshonghuan) · [GitHub Sponsors](https://github.com/sponsors/AriesHongHuanWu).
 

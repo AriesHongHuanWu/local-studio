@@ -15,8 +15,9 @@ import {
   SlidersHorizontal, ChevronRight, ChevronDown, Gauge, Wand2,
 } from 'lucide-react';
 import { Button, Eyebrow } from '../../components/primitives';
-import { createMasterJob, getMasterJob, masterResultUrl, masterMatchedUrl, analyzeMaster } from '../../api/master';
+import { createMasterJob, getMasterJob, masterResultUrl, masterMatchedUrl, matchAudio, analyzeMaster } from '../../api/master';
 import { ABCompare } from './mastering/ABCompare';
+import { saveBinaryUrl } from '../export/saveFile';
 import type { MasterLoudness, MasterMeta, MasterAnalysis } from '../../api/master';
 import { ApiError } from '../../api/client';
 import { useMeta } from '../../state/useMeta';
@@ -78,6 +79,13 @@ export function MasteringFlow() {
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [matchedUrl, setMatchedUrl] = useState<string | null>(null);
   const [resultMeta, setResultMeta] = useState<MasterMeta | null>(null);
+  const [dlBusy, setDlBusy] = useState(false);
+  const [dlMsg, setDlMsg] = useState<string | null>(null);
+  // Three-way A/B/C: an external master uploaded + loudness-matched to ours.
+  const [externalUrl, setExternalUrl] = useState<string | null>(null);
+  const [externalName, setExternalName] = useState<string | null>(null);
+  const [matchingExt, setMatchingExt] = useState(false);
+  const [extErr, setExtErr] = useState<string | null>(null);
 
   // Intelligent analysis (smart diagnosis) — best-effort, never blocks mastering.
   const [analysis, setAnalysis] = useState<MasterAnalysis | null>(null);
@@ -228,6 +236,39 @@ export function MasteringFlow() {
       }
     })();
   }, [file, genre, loudness, reference, dynamics, width, eqBass, eqLowMid, eqPresence, eqAir, compScale, ceiling, autoStrength, poll, t]);
+
+  // Three-way A/B/C: upload an external master → loudness-match it to OUR
+  // master's output LUFS → add as the C source for an original/ours/theirs shoot-out.
+  const pickExternal = useCallback((f: File | null) => {
+    if (!f || !resultMeta) return;
+    setExtErr(null);
+    setMatchingExt(true);
+    setExternalName(f.name);
+    void matchAudio(f, resultMeta.outputLufs)
+      .then((blob) => {
+        setExternalUrl((old) => {
+          if (old) URL.revokeObjectURL(old);
+          return URL.createObjectURL(blob);
+        });
+      })
+      .catch(() => setExtErr(t('master.ab.extFail')))
+      .finally(() => setMatchingExt(false));
+  }, [resultMeta, t]);
+
+  const clearExternal = useCallback(() => {
+    setExternalUrl((old) => { if (old) URL.revokeObjectURL(old); return null; });
+    setExternalName(null);
+    setExtErr(null);
+  }, []);
+
+  // A new/re-run master invalidates any external A/B/C upload — clear + revoke it.
+  useEffect(() => {
+    if (phase === 'running' || phase === 'idle') {
+      setExternalUrl((old) => { if (old) URL.revokeObjectURL(old); return null; });
+      setExternalName(null);
+      setExtErr(null);
+    }
+  }, [phase]);
 
   const running = phase === 'running';
   const isDone = phase === 'done' && !!resultUrl;
@@ -480,8 +521,26 @@ export function MasteringFlow() {
                   matchedUrl={matchedUrl}
                   rawUrl={srcUrl}
                   hasMatched={!!resultMeta?.hasMatched}
+                  externalUrl={externalUrl}
                 />
               )}
+              {/* Three-way: bring in an external master (LANDR/Ozone/anyone) to compare */}
+              <div className="al-ab__extrow">
+                <label className="al-ab__extupload">
+                  <input
+                    type="file"
+                    accept="audio/*,.wav,.mp3,.flac,.m4a,.aac,.ogg"
+                    className="al-master__file"
+                    onChange={(e) => pickExternal(e.target.files?.[0] ?? null)}
+                  />
+                  {matchingExt ? <Loader2 size={13} className="al-spin" /> : <UploadCloud size={13} />}
+                  <span>{externalName ? externalName : t('master.ab.extUpload')}</span>
+                </label>
+                {externalUrl && (
+                  <button type="button" className="al-master__refclear" onClick={clearExternal}>✕</button>
+                )}
+                {extErr && <span className="al-ab__exterr">{extErr}</span>}
+              </div>
             </div>
 
             {resultMeta?.chain && (
@@ -522,19 +581,25 @@ export function MasteringFlow() {
               </div>
             )}
 
-            <Button
-              variant="primary"
-              size="md"
-              icon={<Download size={15} />}
-              onClick={() => {
-                const a = document.createElement('a');
-                a.href = resultUrl;
-                a.download = 'mastered.wav';
-                a.click();
-              }}
-            >
-              {t('master.download')}
-            </Button>
+            <div className="al-master__downloadrow">
+              <Button
+                variant="primary"
+                size="md"
+                icon={dlBusy ? <Loader2 size={15} className="al-spin" /> : <Download size={15} />}
+                disabled={dlBusy}
+                onClick={() => {
+                  setDlBusy(true);
+                  setDlMsg(null);
+                  void saveBinaryUrl(resultUrl, 'mastered.wav')
+                    .then((o) => setDlMsg(o.kind === 'tauri' ? t('master.dlSaved') : o.kind === 'download' ? t('master.dlDone') : null))
+                    .catch(() => setDlMsg(t('master.dlFail')))
+                    .finally(() => setDlBusy(false));
+                }}
+              >
+                {t('master.download')}
+              </Button>
+              {dlMsg && <span className="al-master__dlmsg">{dlMsg}</span>}
+            </div>
           </div>
         </section>
       )}

@@ -598,3 +598,16 @@
 .al-ab__lmatch input { accent-color: var(--al-gold); }
 .al-ab__lmatchstate { font-size: var(--al-text-xs); color: var(--al-ink-faint); }
 .al-ab__why { margin: 0; font-size: var(--al-text-xs); color: var(--al-ink-muted); line-height: 1.5; }
+
+.al-master__downloadrow { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.al-master__dlmsg { font-size: var(--al-text-sm); color: var(--al-green); }
+
+.al-ab__extrow { display: flex; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+.al-ab__extupload {
+  display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
+  font-size: var(--al-text-sm); color: var(--al-ink-dim);
+  padding: 6px 12px; border: 1px dashed var(--al-hairline-strong);
+  border-radius: var(--al-radius-ctrl); background: var(--al-surface-2);
+}
+.al-ab__extupload:hover { color: var(--al-ink); border-color: var(--al-ink-faint); }
+.al-ab__exterr { font-size: var(--al-text-xs); color: var(--al-error); }

@@ -1116,6 +1116,22 @@ def analyze_file(path: str, *, genre: str = "auto", strength: float = 0.7) -> di
     return analyze(data, sr, genre=genre, strength=strength)
 
 
+def match_loudness(input_path: str, output_path: str, target_lufs: float) -> dict:
+    """把任一音檔調到 target_lufs(只縮放、不做任何處理),寫成 24-bit WAV。
+    供「三方比較」把外部母帶對齊到本軟體母帶的響度,公平 A/B/C。回 {matchedLufs, gainDb}。"""
+    if not _HAS_DSP:
+        raise RuntimeError("母帶 DSP 相依不可用(需 scipy + pyloudnorm)")
+    data, sr = _load_audio(input_path)
+    cur = _measure_lufs(data, sr)
+    gain_db = float(np.clip(float(target_lufs) - cur, -24.0, 24.0))
+    out = data * (10 ** (gain_db / 20.0))
+    pk = float(np.max(np.abs(out))) if out.size else 0.0
+    if pk > 1.0:
+        out = out / pk  # 等比縮放避免破峰,LUFS 匹配維持在 ~0.1dB 內
+    _write_wav(output_path, out, sr)
+    return {"matchedLufs": round(_measure_lufs(out, sr), 2), "gainDb": round(gain_db, 2)}
+
+
 # =========================================================================== #
 # 專業處理鏈(Pro chain)—— 多頻段壓縮、齒音消除、諧波飽和、二次修正 EQ、
 # 立體聲示波器資料。全 numpy/scipy,授權乾淨。
