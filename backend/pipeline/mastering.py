@@ -1025,10 +1025,13 @@ def detect_genre(data: "np.ndarray", sr: int) -> dict:
 
 
 def analyze(data: "np.ndarray", sr: int, *, genre: str = "auto",
-            section_amount: Optional[float] = None, strength: float = 0.7) -> dict:
+            section_amount: Optional[float] = None, strength: float = 0.7,
+            light: bool = False) -> dict:
     """整首歌的智慧分析:響度/動態/頻譜/立體聲 + 問題清單 + 自動修正 + 視覺化資料。
 
     回傳結構見 README/前端 MasterAnalysis 型別。任一度量失敗都以安全值降級,不丟例外。
+    light=True(效能模式 / 小筆電):跳過昂貴的滑動響度(短期/瞬間/LRA)與 4× 真峰超取樣,
+    用整體 LUFS + 取樣峰值近似 → 分析快 ~3-4×,只用於『母帶後』視覺化(修正仍用完整前分析)。
     """
     if not _HAS_DSP:
         raise RuntimeError("母帶 DSP 相依不可用(需 scipy + pyloudnorm)")
@@ -1040,12 +1043,18 @@ def analyze(data: "np.ndarray", sr: int, *, genre: str = "auto",
 
     # ── 響度 ──────────────────────────────────────────────
     integrated = _measure_lufs(xa, asr)
-    st = _sliding_loudness(xa, asr, 3.0, hop_s=0.5)
-    mom = _sliding_loudness(xa, asr, 0.4, hop_s=0.1)
-    short_term_max = float(np.max(st)) if st.size else integrated
-    momentary_max = float(np.max(mom)) if mom.size else integrated
-    lra = _lra(_sliding_loudness(xa, asr, 3.0, hop_s=0.1))
-    true_peak = _true_peak_dbtp(data, sr)
+    if light:  # 效能模式:跳過滑動響度 + 用取樣峰值(省下分析裡最貴的幾段)
+        st = mom = np.array([])
+        short_term_max = momentary_max = integrated
+        lra = 0.0
+        true_peak = _peak_db(data)
+    else:
+        st = _sliding_loudness(xa, asr, 3.0, hop_s=0.5)
+        mom = _sliding_loudness(xa, asr, 0.4, hop_s=0.1)
+        short_term_max = float(np.max(st)) if st.size else integrated
+        momentary_max = float(np.max(mom)) if mom.size else integrated
+        lra = _lra(_sliding_loudness(xa, asr, 3.0, hop_s=0.1))
+        true_peak = _true_peak_dbtp(data, sr)
     sample_peak = _peak_db(xa)
 
     # ── 動態 ──────────────────────────────────────────────
@@ -1578,19 +1587,22 @@ def _deesser(data: "np.ndarray", sr: int, *, f_lo: float = 5000.0, f_hi: float =
                  "active_pct": round(100.0 * active_frac, 1)}
 
 
-def _saturate(data: "np.ndarray", sr: int, *, amount: float = 0.3, asymmetry: float = 0.2) -> "np.ndarray":
-    """溫和諧波飽和(類比暖度 / 人味)+ dry/wet。2× 過取樣抗混疊。RMS 對齊乾訊號(響度由後段決定)。"""
+def _saturate(data: "np.ndarray", sr: int, *, amount: float = 0.3, asymmetry: float = 0.2,
+              oversample: int = 2) -> "np.ndarray":
+    """溫和諧波飽和(類比暖度 / 人味)+ dry/wet。2× 過取樣抗混疊(效能模式用 1×,省一半時間)。
+    RMS 對齊乾訊號(響度由後段決定)。"""
     amt = float(np.clip(amount, 0.0, 1.0))
     if amt < 1e-3:
         return data
     drive = 1.0 + 4.0 * amt
     wet = 0.25 + 0.45 * amt
-    up = sps.resample_poly(data, 2, 1, axis=0)
+    os = max(1, int(oversample))
+    up = sps.resample_poly(data, os, 1, axis=0) if os > 1 else data
     x = up * drive
     tx = np.tanh(x)
     shaped = tx + asymmetry * amt * (tx ** 2 - np.mean(tx ** 2, axis=0))
     shaped = shaped / drive
-    down = sps.resample_poly(shaped, 1, 2, axis=0)
+    down = sps.resample_poly(shaped, 1, os, axis=0) if os > 1 else shaped
     if down.shape[0] >= data.shape[0]:
         down = down[: data.shape[0]]
     else:
@@ -2014,6 +2026,7 @@ def master(
     adaptive_eq: Optional[bool] = None,
     automation_eq: Optional[list] = None,
     stem_rebalance: Optional[dict] = None,
+    performance: bool = False,
     matched_output_path: Optional[str] = None,
     analyze_result: bool = True,
     progress: Optional[ProgressFn] = None,
@@ -2106,7 +2119,8 @@ def master(
     corr: Optional[dict] = None
     if auto or analyze_result:
         try:
-            analysis_before = analyze(data, sr, genre=genre, strength=auto_strength)
+            # 效能模式:前分析也走 light(修正仍用頻段偏差 + crest;省下昂貴的滑動響度/真峰超取樣)
+            analysis_before = analyze(data, sr, genre=genre, strength=auto_strength, light=performance)
             corr = analysis_before.get("corrections")
         except Exception:
             logger.warning("智慧分析失敗,改用曲風預設(降級)", exc_info=True)
@@ -2290,7 +2304,7 @@ def master(
     if sat_amount > 1e-3:
         _emit(progress, 66.0, "諧波飽和 · Harmonic glue")
         try:
-            data = _saturate(data, sr, amount=sat_amount)
+            data = _saturate(data, sr, amount=sat_amount, oversample=(1 if performance else 2))
             meters["saturation"] = {"amount": round(sat_amount, 3)}
             stages.append("saturation")
         except Exception:
@@ -2339,7 +2353,8 @@ def master(
     if analyze_result:
         _emit(progress, 92.0, "分析母帶結果 · Analyzing result")
         try:
-            analysis_after = analyze(data, sr, genre=genre, section_amount=dyn_eff)
+            # 效能模式:結果分析走 light(省下最貴的滑動響度/真峰超取樣)
+            analysis_after = analyze(data, sr, genre=genre, section_amount=dyn_eff, light=performance)
         except Exception:
             logger.warning("結果分析失敗(降級,不影響輸出)", exc_info=True)
             analysis_after = None
@@ -2387,7 +2402,7 @@ def master(
         "before": analysis_before,
         "after": analysis_after,
         "meters": _finite_scrub(meters),
-        "goniometer": _finite_scrub(_goniometer(data, sr)),
+        "goniometer": _finite_scrub({} if performance else _goniometer(data, sr)),
         "chain": {
             "stages": stages,
             "deEss": round(deess_amount, 3),

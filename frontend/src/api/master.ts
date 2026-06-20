@@ -247,6 +247,8 @@ export interface MasterAdvanced {
   automationEq?: string;
   /** Pro mode: JSON-stringified AI stem rebalance {enabled, gains:{drums,bass,vocals,other}}. */
   stemRebalance?: string;
+  /** Performance mode (small laptops): lighter analysis + oversampling, faster master. */
+  performance?: boolean;
 }
 
 /** POST /api/master — spawn the background mastering job. */
@@ -288,6 +290,7 @@ export async function createMasterJob(
     if (a.multibandManual) form.append('multibandManual', a.multibandManual);
     if (a.automationEq) form.append('automationEq', a.automationEq);
     if (a.stemRebalance) form.append('stemRebalance', a.stemRebalance);
+    if (a.performance) form.append('performance', 'true');
   }
 
   let res: Response;

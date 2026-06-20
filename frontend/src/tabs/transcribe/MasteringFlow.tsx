@@ -63,6 +63,10 @@ export function MasteringFlow() {
   // Auto-correction strength (0.2 natural ↔ 1.0 strong) for intelligent mode.
   const [autoStrength, setAutoStrength] = useState(0.6);
 
+  // Performance mode (small laptops): lighter analysis + oversampling → faster master.
+  // Defaults ON when the machine has no GPU (a strong "low-power laptop" signal).
+  const [performance, setPerformance] = useState(() => !meta.gpu);
+
   // Pro mode: a fully-parametric EQ (per-band phase + Mid/Side/L/R routing).
   const [proMode, setProMode] = useState(false);
   const [paramBands, setParamBands] = useState<EqBand[]>([]);
@@ -258,6 +262,7 @@ export function MasteringFlow() {
           stemRebalance: proMode && stemEnabled && meta.demucs
             ? JSON.stringify({ enabled: true, gains: stemGains })
             : undefined,
+          performance: performance || undefined,
         });
         if (stoppedRef.current) return;
         pollTimer.current = setTimeout(() => void poll(jobId), POLL_MS);
@@ -269,7 +274,7 @@ export function MasteringFlow() {
         setPhase('error');
       }
     })();
-  }, [file, genre, loudness, reference, dynamics, width, eqBass, eqLowMid, eqPresence, eqAir, compScale, ceiling, autoStrength, proMode, paramBands, adaptiveEq, mbEnabled, mbCrossovers, mbBands, autoEnabled, autoLanes, stemEnabled, stemGains, poll, t]);
+  }, [file, genre, loudness, reference, dynamics, width, eqBass, eqLowMid, eqPresence, eqAir, compScale, ceiling, autoStrength, proMode, paramBands, adaptiveEq, mbEnabled, mbCrossovers, mbBands, autoEnabled, autoLanes, stemEnabled, stemGains, performance, poll, t]);
 
   // Three-way A/B/C: upload an external master → loudness-match it to OUR
   // master's output LUFS → add as the C source for an original/ours/theirs shoot-out.
@@ -524,6 +529,14 @@ export function MasteringFlow() {
             <Slider label={t('master.adv.comp')} value={compScale} onChange={setCompScale} min={0} max={2} step={0.05} unit="×" disabled={running} />
             <Slider label={t('master.adv.width')} value={width} onChange={setWidth} min={0.5} max={1.5} step={0.05} unit="×" disabled={running} />
             <Slider label={t('master.adv.ceiling')} value={ceiling} onChange={setCeiling} min={-6} max={0} step={0.1} unit="dBTP" disabled={running} />
+            <p className="al-master__advgroup">{t('master.adv.perfGroup')}</p>
+            <label className="al-master__switch">
+              <input type="checkbox" checked={performance} onChange={(e) => setPerformance(e.target.checked)} disabled={running} />
+              <span className="al-master__switchbody">
+                <span className="al-master__switchtitle"><Gauge size={14} /> {t('master.perf.toggle')}</span>
+                <span className="al-master__switchhint">{t('master.perf.hint')}</span>
+              </span>
+            </label>
             <button type="button" className="al-master__advreset" onClick={resetAdv} disabled={running}>
               {t('master.adv.reset')}
             </button>

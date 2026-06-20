@@ -1964,6 +1964,7 @@ def _run_master_job(
             multiband_manual=opts.get("multiband_manual"),
             automation_eq=opts.get("automation_eq"),
             stem_rebalance=opts.get("stem_rebalance"),
+            performance=bool(opts.get("performance")),
             saturation=opts.get("saturation", 0.0),
             residual_eq=opts.get("residual_eq"),
             param_eq=opts.get("param_eq"),
@@ -2024,6 +2025,7 @@ async def api_master(
     multibandManual: Optional[str] = Form(None),
     automationEq: Optional[str] = Form(None),
     stemRebalance: Optional[str] = Form(None),
+    performance: Optional[bool] = Form(None),
 ) -> JSONResponse:
     """建立母帶工作。multipart:audio=混音檔,genre,loudness,選用 reference=參考曲,
     以及選用的進階參數(width/dynamics/eq*/compScale/ceiling)。
@@ -2062,6 +2064,7 @@ async def api_master(
         "multiband_manual": _parse_multiband(multibandManual),
         "automation_eq": _parse_automation_eq(automationEq),
         "stem_rebalance": _parse_stem_rebalance(stemRebalance),
+        "performance": bool(performance) if performance is not None else None,
     }
 
     valid_genres = [g["key"] for g in mastering.genres()] if mastering is not None else ["auto"]  # type: ignore[union-attr]

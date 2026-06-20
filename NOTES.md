@@ -1,18 +1,20 @@
-# Local Studio v0.1.31
+# Local Studio v0.1.32
 
-🎛️ **Smarter auto-mastering** — the intelligent mode now catches more problems and adapts its processing to what it hears.
+💻 **Better on small laptops** — a performance mode that lightens the mastering work for weaker, GPU-less machines, on automatically where it's needed.
 
-### New — more auto detection & correction
-- **Boxy / honky detection** — the analyzer now flags a mid-band buildup (400–800 Hz) that makes a mix sound boxy or nasal, and the **auto dynamic EQ tames it** (joining the existing harsh / muddy / boomy taming — so the dynamic EQ now places more bands automatically, only acting on the moments that need it).
-- **Tone-aware saturation** — the automatic harmonic glue now reads the mix: a **dark/dull** master gets a touch more saturation for life and warmth, while a **harsh/sibilant** one gets less so it never adds edge. (Sibilance stays with the adaptive de-esser — no double-processing.)
+### New — performance mode
+A new **Performance mode (small laptops)** option (Pro → Advanced) makes mastering lighter:
+- Skips the heaviest measurement work (the sliding loudness history and 4× true-peak oversampling) and runs the harmonic saturation without oversampling.
+- The master still lands on the same target loudness, stays peak-safe, and applies the same corrective EQ — the quality difference is negligible; it just does less number-crunching.
+- **On by default when your machine has no GPU** (a strong "low-power laptop" signal), so small laptops get the lighter path automatically. You can toggle it any time.
 
-Combined with v0.1.30's visible auto-EQ curve and adaptive de-esser, the intelligent mode is now both more complete and more transparent about what it's doing.
+This keeps Local Studio responsive on modest hardware, where the full analysis on every master would otherwise be slow.
 
 ### Unchanged
-- AI stem mastering, genre detection, EQ automation lanes, manual multiband, adaptive EQ, Pro parametric EQ, A/B + three-way comparison, and download all work as before.
+- All mastering features (AI stem mastering, genre detection, auto-EQ curve, automation lanes, manual multiband, adaptive EQ, Pro parametric EQ) and the lyrics/subtitles/text-removal modes work as before.
 
 ### Coming next
-Low-end-laptop compatibility, then a categorized + pinnable tool sidebar and clearer positioning for artists and content creators.
+A categorized + pinnable tool sidebar, and clearer positioning for artists and content creators.
 
 Support: ☕ [Ko-fi](https://ko-fi.com/arieswu) · [PayPal](https://paypal.me/Arieshonghuan) · [GitHub Sponsors](https://github.com/sponsors/AriesHongHuanWu).
 

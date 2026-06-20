@@ -118,6 +118,12 @@ export const common: Record<string, Entry> = {
   'master.adv.width': { zh: '立體聲寬度', en: 'Stereo width' },
   'master.adv.ceiling': { zh: '真峰天花板', en: 'True-peak ceiling' },
   'master.adv.reset': { zh: '重設進階', en: 'Reset advanced' },
+  'master.adv.perfGroup': { zh: '效能', en: 'Performance' },
+  'master.perf.toggle': { zh: '效能模式(小筆電)', en: 'Performance mode (small laptops)' },
+  'master.perf.hint': {
+    zh: '較輕的分析與處理(跳過最吃資源的響度/超取樣計算),在無獨顯/較弱的機器上更快出母帶。音質差異極小。無顯卡時預設開啟。',
+    en: 'Lighter analysis & processing (skips the heaviest loudness/oversampling work) — masters faster on weak / GPU-less machines, with negligible quality difference. On by default when no GPU is present.',
+  },
 
   // ── Smart analysis (intelligent auto-mastering) ──
   'master.section.analysis': { zh: '智慧分析', en: 'Smart analysis' },
