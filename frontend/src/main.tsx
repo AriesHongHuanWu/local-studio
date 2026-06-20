@@ -7,12 +7,15 @@ import './styles/fonts.css';
 import './styles/global.css';
 
 import App from './App';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 const rootEl = document.getElementById('root');
 if (!rootEl) throw new Error('Root element #root not found');
 
 createRoot(rootEl).render(
   <StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </StrictMode>,
 );

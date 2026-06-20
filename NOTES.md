@@ -1,26 +1,18 @@
-# Local Studio v0.1.34
+# Local Studio v0.1.35
 
-🧰 **New mode: Audio Toolbox** — a growing set of handy audio tools, including the **de-ess analyzer** you asked for (it tells you *which frequency to filter*). 11 tools to start, and the framework makes adding more trivial.
+🛠️ **Fixes: mastering download + no more black screens** — plus the new Audio Toolbox (11 tools, from v0.1.34) with its downloads now working.
 
-### New — 音訊工具箱 (Audio Toolbox)
-A new tool under **Audio**, organised into categories. Pick a tool, drop a file, run:
+### Fixed — "download failed" on masters (and toolbox audio)
+Saving a mastered WAV (and any processed audio from the Audio Toolbox) was failing with "download failed". The app had permission to write **text** files but not **binary** files, so writing the WAV bytes was blocked. Granting binary-file write permission fixes every audio download.
 
-**Analyze** (gives you info)
-- 🎙️ **De-ess analyzer** — finds the real sibilance frequency in a vocal and recommends exactly which band to filter + the threshold (e.g. "*sibilance at ~7 kHz → de-ess 5.5–9.2 kHz, threshold −20 dB*").
-- 📊 **Loudness meter** — LUFS / true-peak / crest vs streaming targets (Spotify −14, Apple −16, Club −9), to QC before upload.
-- 🎵 **Key & BPM** — detect a song's musical key and tempo (great for sampling, remixing, DJ matching).
+### Fixed — black screen / crash recovery
+If something in the UI ever errored (e.g. on certain actions), the whole window could go black with no way back. There's now an **error boundary**: instead of a black screen you get a recoverable message with **Try again** / **Reload**, and your files are never affected. (If you still hit an error after a specific action like uploading a reference track, it'll now show what went wrong instead of vanishing — please send that text so it can be pinned down.)
 
-**Loudness / Repair / Edit / Stereo / Export**
-- 🎚️ **Loudness normalizer** — to a target LUFS, peak-safe.
-- ⚡ **Hum removal** — kill 50/60 Hz mains hum + harmonics.
-- 🌬️ **Noise reduction** — spectral gate for steady background noise (voice/recordings).
-- ✂️ **Silence trim**, 📈 **Fade in/out**, ↔️ **Stereo width / mono**, ✛ **DC removal + normalize**.
-- 🔊 **Format converter** — WAV / FLAC / MP3 / OGG.
+### New (from v0.1.34) — Audio Toolbox
+A new **Toolbox** tool under Audio with 11 utilities: **de-ess analyzer** (tells you which frequency to filter), loudness meter, key & BPM, loudness normalizer, hum removal, noise reduction, silence trim, fade, stereo width, DC removal, and format conversion (WAV/FLAC/MP3/OGG). Downloads from it now work (see the fix above).
 
-Everything runs locally (license-clean numpy/scipy/pyloudnorm/libsndfile). More tools will keep landing in this Toolbox.
-
-### Unchanged
-- Mastering, lyrics, subtitles, text removal, and the categorized + pinnable sidebar all work as before.
+### Coming next
+A high-quality YouTube/URL audio downloader (for beats you have the rights to), so you can pull a track in and process/master it right away.
 
 Support: ☕ [Ko-fi](https://ko-fi.com/arieswu) · [PayPal](https://paypal.me/Arieshonghuan) · [GitHub Sponsors](https://github.com/sponsors/AriesHongHuanWu).
 
