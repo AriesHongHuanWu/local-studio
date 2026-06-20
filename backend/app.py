@@ -32,6 +32,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -49,7 +50,8 @@ logger = logging.getLogger("autolyrics.app")
 # 由 Tauri 殼層在 spawn 時以 APP_VERSION 環境變數注入真實 App 版本;獨立執行時退回。
 VERSION = os.environ.get("APP_VERSION", "0.1.0-dev")
 HOST = "127.0.0.1"
-PORT = 8756
+# 預設 8756;可用 AUTOLYRICS_PORT 覆寫(供開發/測試在備用埠啟動,不影響正式行為)。
+PORT = int(os.environ.get("AUTOLYRICS_PORT", "8756"))
 
 # 後端根目錄 / 前端靜態檔目錄
 BACKEND_DIR = Path(__file__).resolve().parent
@@ -1844,6 +1846,8 @@ def _run_master_job(
             eq=opts.get("eq"),
             comp_scale=opts.get("comp_scale", 1.0),
             ceiling_db=opts.get("ceiling_db"),
+            auto=opts.get("auto", False),
+            auto_strength=opts.get("auto_strength", 0.7),
             progress=progress,
         )
         with _MASTER_JOBS_LOCK:
@@ -1888,6 +1892,8 @@ async def api_master(
     eqAir: Optional[float] = Form(None),
     compScale: Optional[float] = Form(None),
     ceiling: Optional[float] = Form(None),
+    auto: Optional[bool] = Form(None),
+    autoStrength: Optional[float] = Form(None),
 ) -> JSONResponse:
     """建立母帶工作。multipart:audio=混音檔,genre,loudness,選用 reference=參考曲,
     以及選用的進階參數(width/dynamics/eq*/compScale/ceiling)。
@@ -1914,6 +1920,8 @@ async def api_master(
         "eq": eq_bands if any(abs(v) > 1e-3 for v in eq_bands.values()) else None,
         "comp_scale": _f(compScale, 0.0, 2.0) if compScale is not None else 1.0,
         "ceiling_db": _f(ceiling, -6.0, 0.0),
+        "auto": bool(auto) if auto is not None else False,
+        "auto_strength": _f(autoStrength, 0.2, 1.0) if autoStrength is not None else 0.7,
     }
 
     valid_genres = [g["key"] for g in mastering.genres()] if mastering is not None else ["auto"]  # type: ignore[union-attr]
@@ -2000,6 +2008,58 @@ def api_get_master_result(job_id: str) -> FileResponse:
     if not out_path or not os.path.exists(out_path):
         raise HTTPException(status_code=404, detail="找不到輸出檔案")
     return FileResponse(out_path, media_type="audio/wav", filename="mastered.wav")
+
+
+@app.post("/api/master/analyze")
+async def api_master_analyze(
+    audio: UploadFile = File(...),
+    genre: str = Form("auto"),
+    strength: Optional[float] = Form(None),
+) -> JSONResponse:
+    """智慧分析一首混音(不做母帶,只回診斷 + 視覺化資料 + 自動修正建議)。
+    multipart:audio=混音檔,選用 genre、strength(自動校正力度 0.2..1.0)。
+    回傳 MasterAnalysis(同步,於 threadpool 跑)。"""
+    _require_mastering()
+
+    g = (genre or "auto").strip().lower()
+    valid_genres = [x["key"] for x in mastering.genres()] if mastering is not None else ["auto"]  # type: ignore[union-attr]
+    if g not in valid_genres:
+        g = "auto"
+    try:
+        s = max(0.2, min(1.0, float(strength))) if strength is not None else 0.7
+    except (TypeError, ValueError):
+        s = 0.7
+
+    tmp = UPLOAD_DIR / f"analyzein_{uuid.uuid4().hex}{_safe_upload_suffix(audio.filename)}"
+    try:
+        data = await audio.read()
+        if not data:
+            raise HTTPException(status_code=400, detail="上傳的音檔是空的")
+        tmp.write_bytes(data)
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=f"上傳音檔儲存失敗:{e}") from e
+    finally:
+        await audio.close()
+
+    try:
+        if mastering is None:  # pragma: no cover
+            raise RuntimeError("pipeline.mastering 不可用")
+        result = await run_in_threadpool(mastering.analyze_file, str(tmp), genre=g, strength=s)
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001
+        logger.error("母帶分析失敗:%s\n%s", e, traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"分析失敗:{e}") from e
+    finally:
+        try:
+            if tmp.exists():
+                tmp.unlink()
+        except OSError:
+            pass
+
+    return JSONResponse(result)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -36,7 +36,11 @@ _STAGE = "master"
 try:
     import numpy as np  # type: ignore
     import scipy.signal as sps  # type: ignore
-    from scipy.ndimage import minimum_filter1d, uniform_filter1d  # type: ignore
+    from scipy.ndimage import (  # type: ignore
+        minimum_filter1d,
+        maximum_filter1d,
+        uniform_filter1d,
+    )
     import pyloudnorm as pyln  # type: ignore
 
     _HAS_DSP = True
@@ -410,6 +414,682 @@ def _advanced_eq(data: "np.ndarray", sr: int, eq: dict) -> "np.ndarray":
     return _apply_eq(data, sr, bands) if bands else data
 
 
+# =========================================================================== #
+# 智慧分析(Intelligent analysis)—— 偵測這首歌的響度/動態/頻譜/立體聲問題,
+# 給出可視化資料 + 自動修正建議。只用 numpy/scipy/pyloudnorm,授權乾淨。
+# =========================================================================== #
+
+# 分析頻段(name, lo_hz, hi_hz)
+_BANDS: list[tuple[str, float, float]] = [
+    ("sub", 20.0, 60.0),
+    ("bass", 60.0, 150.0),
+    ("low_mid", 150.0, 400.0),
+    ("mid", 400.0, 2000.0),
+    ("high_mid", 2000.0, 6000.0),
+    ("presence", 6000.0, 10000.0),
+    ("air", 10000.0, 20000.0),
+]
+
+# 每個頻段對應的修正用 EQ(kind, center_hz, q)—— 把 band gain 套成實際 biquad
+_BAND_EQ: dict[str, tuple[str, float, float]] = {
+    "sub": ("low_shelf", 45.0, 0.7),
+    "bass": ("peak", 95.0, 0.9),
+    "low_mid": ("peak", 250.0, 1.0),
+    "mid": ("peak", 900.0, 0.8),
+    "high_mid": ("peak", 3500.0, 1.0),
+    "presence": ("peak", 8000.0, 1.2),
+    "air": ("high_shelf", 12000.0, 0.7),
+}
+
+# 目標頻譜曲線參數:以 1kHz 為錨點的 ~-3.5 dB/oct 傾斜(現代全頻母帶的耐聽斜率)
+_TARGET_TILT_DB_OCT = -3.5
+_TARGET_ANCHOR_HZ = 1000.0
+
+# 曲風對「目標頻段」的小幅偏移(dB)—— 資料驅動為主,曲風只做微調(乘 0.6)
+_GENRE_OFFSETS: dict[str, dict[str, float]] = {
+    "auto": {b[0]: 0.0 for b in _BANDS},
+    "pop": {"sub": 0, "bass": 0.5, "low_mid": -0.5, "mid": 0, "high_mid": 0.5, "presence": 0.5, "air": 1.0},
+    "hiphop": {"sub": 1.5, "bass": 1.5, "low_mid": -1.0, "mid": -0.5, "high_mid": 0, "presence": 0, "air": 0},
+    "edm": {"sub": 1.0, "bass": 1.0, "low_mid": -1.0, "mid": 0, "high_mid": 0.5, "presence": 0.5, "air": 1.0},
+    "rock": {"sub": 0, "bass": 0.5, "low_mid": 0, "mid": 0.5, "high_mid": 0.5, "presence": 0, "air": -0.5},
+    "rnb": {"sub": 1.0, "bass": 1.0, "low_mid": 0, "mid": 0, "high_mid": 0, "presence": 0.5, "air": 0.5},
+    "acoustic": {"sub": -0.5, "bass": 0, "low_mid": 0.5, "mid": 0.5, "high_mid": 0, "presence": 0, "air": 0.5},
+    "ballad": {"sub": 0, "bass": 0, "low_mid": 0, "mid": 0.5, "high_mid": 0, "presence": 0, "air": 1.0},
+    "lofi": {"sub": 1.0, "bass": 1.0, "low_mid": 1.0, "mid": 0, "high_mid": -2.0, "presence": -2.0, "air": -3.0},
+}
+
+_ANALYSIS_SR = 44100  # 分析統一在此取樣率(過高的來源先降採樣,加速且結果穩定)
+
+
+def _analysis_signal(data: "np.ndarray", sr: int) -> tuple["np.ndarray", int]:
+    """分析用訊號:>48k 先降到 44.1k(只供分析,真峰仍用原始 sr 量)。"""
+    if sr > 48000:
+        try:
+            xa = sps.resample_poly(data, _ANALYSIS_SR, sr, axis=0)
+            return np.ascontiguousarray(xa, dtype=np.float64), _ANALYSIS_SR
+        except Exception:
+            return data, sr
+    return data, sr
+
+
+def _true_peak_dbtp(data: "np.ndarray", sr: int) -> float:
+    """過取樣真峰(BS.1770):sr<=48k 用 4×、更高用 2×。失敗回退取樣峰值。"""
+    try:
+        os_factor = 4 if sr <= 48000 else 2
+        up = sps.resample_poly(data, os_factor, 1, axis=0)
+        peak = float(np.max(np.abs(up))) + 1e-12
+        return 20.0 * np.log10(peak)
+    except Exception:
+        return _peak_db(data)
+
+
+def _k_weighted(x: "np.ndarray", sr: int) -> "np.ndarray":
+    """BS.1770 K-weighting(高棚 + RLB 高通)。任一步失敗→回未加權(度量退化但不崩)。"""
+    try:
+        from pyloudnorm import IIRfilter  # type: ignore
+
+        hs = IIRfilter(4.0, 1.0 / np.sqrt(2.0), 1500.0, sr, "high_shelf")
+        hp = IIRfilter(0.0, 0.5, 38.0, sr, "high_pass")
+        y = np.empty_like(x)
+        for ch in range(x.shape[1]):
+            c = hs.apply_filter(x[:, ch])
+            c = hp.apply_filter(c)
+            y[:, ch] = c
+        return y
+    except Exception:
+        return x
+
+
+def _sliding_loudness(x: "np.ndarray", sr: int, win_s: float, hop_s: float = 0.1) -> "np.ndarray":
+    """滑動視窗 BS.1770 響度(未閘控),向量化(平方累積和)。回傳每個視窗的 LUFS。"""
+    y = _k_weighted(x, sr)
+    power = np.sum(y ** 2, axis=1)  # 兩聲道功率和(stereo 權重=1)
+    w = max(1, int(win_s * sr))
+    hop = max(1, int(hop_s * sr))
+    n = power.shape[0]
+    if n < w:
+        ms = float(np.mean(power)) if n else 1e-12
+        return np.array([-0.691 + 10.0 * np.log10(ms + 1e-12)])
+    csum = np.concatenate([[0.0], np.cumsum(power)])
+    idx = np.arange(0, n - w + 1, hop)
+    seg_ms = (csum[idx + w] - csum[idx]) / w
+    return -0.691 + 10.0 * np.log10(seg_ms + 1e-12)
+
+
+def _lra(st: "np.ndarray") -> float:
+    """EBU Tech 3342 響度範圍:絕對閘 -70,相對閘 (能量平均-20),95%-10% 區間。"""
+    s = st[st > -70.0]
+    if s.size < 2:
+        return 0.0
+    rel = -0.691 + 10.0 * np.log10(np.mean(10.0 ** ((s + 0.691) / 10.0)) + 1e-12)
+    s = s[s > rel - 20.0]
+    if s.size < 2:
+        return 0.0
+    return float(np.percentile(s, 95) - np.percentile(s, 10))
+
+
+def _welch_psd(mono: "np.ndarray", sr: int, nfft: int = 8192) -> tuple["np.ndarray", "np.ndarray"]:
+    """時間平均功率譜密度(Welch)。一次呼叫即可服務頻段能量 + 繪圖曲線。
+
+    對極短訊號要安全:nperseg 不可超過訊號長度,且 noverlap 必須 < nperseg —— 否則
+    scipy.welch 會丟 ValueError。極短(<16 樣本)直接回退一條平坦微譜。
+    """
+    n = int(mono.shape[0])
+    if n < 16:
+        return np.array([0.0, sr / 2.0]), np.full(2, 1e-12)
+    nper = min(nfft, n)  # 不再硬性墊高到 256(會超過短訊號長度而崩潰)
+    noverlap = min(nper // 2, nper - 1)
+    f, pxx = sps.welch(mono, fs=sr, window="hann", nperseg=nper,
+                       noverlap=noverlap, detrend=False, scaling="density")
+    return f, pxx
+
+
+def _trapz(y: "np.ndarray", x: "np.ndarray") -> float:
+    """numpy 1.x/2.x 相容:2.0 把 trapz 改名 trapezoid。"""
+    fn = getattr(np, "trapezoid", None)
+    if fn is None:
+        fn = np.trapz  # type: ignore[attr-defined]
+    return float(fn(y, x))
+
+
+def _finite_scrub(obj: Any) -> Any:
+    """遞迴把任何非有限浮點(NaN/±Inf)換成 0.0 —— 確保回傳的 JSON 能被瀏覽器嚴格
+    解析(Starlette 預設 allow_nan=True 會吐裸 NaN/Infinity token,res.json() 會丟)。"""
+    if isinstance(obj, float):
+        return obj if (obj == obj and obj not in (float("inf"), float("-inf"))) else 0.0
+    if isinstance(obj, dict):
+        return {k: _finite_scrub(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_finite_scrub(v) for v in obj]
+    return obj
+
+
+def _band_levels_db(f: "np.ndarray", pxx: "np.ndarray") -> dict[str, float]:
+    out: dict[str, float] = {}
+    for name, lo, hi in _BANDS:
+        m = (f >= lo) & (f < hi)
+        p = _trapz(pxx[m], f[m]) if np.any(m) else 1e-12
+        out[name] = 10.0 * np.log10(p + 1e-12)
+    return out
+
+
+def _target_curve_db(f: "np.ndarray") -> "np.ndarray":
+    """目標母帶頻譜(相對 dB):-3.5 dB/oct 傾斜 + 低頻微抬 + 低中微凹 + 空氣微抬。"""
+    fc = np.clip(f, 20.0, 20000.0)
+    base = _TARGET_TILT_DB_OCT * np.log2(fc / _TARGET_ANCHOR_HZ)
+    shape = (
+        1.5 * np.exp(-((np.log2(fc / 60.0)) ** 2) / 0.5)
+        - 1.0 * np.exp(-((np.log2(fc / 300.0)) ** 2) / 0.4)
+        + 1.0 * np.exp(-((np.log2(fc / 12000.0)) ** 2) / 0.6)
+    )
+    return base + shape
+
+
+def _target_band_levels(genre: str) -> dict[str, float]:
+    """目標頻段能量(對目標曲線在各頻段積分)+ 曲風微調(×0.6)。"""
+    f = np.geomspace(20.0, 20000.0, 2048)
+    tdb = _target_curve_db(f)
+    plin = 10.0 ** (tdb / 10.0)  # 視為相對功率密度
+    levels: dict[str, float] = {}
+    for name, lo, hi in _BANDS:
+        m = (f >= lo) & (f < hi)
+        p = _trapz(plin[m], f[m]) if np.any(m) else 1e-12
+        levels[name] = 10.0 * np.log10(p + 1e-12)
+    off = _GENRE_OFFSETS.get(genre, _GENRE_OFFSETS["auto"])
+    return {k: levels[k] + 0.6 * float(off.get(k, 0.0)) for k in levels}
+
+
+def _spectral_centroid(f: "np.ndarray", pxx: "np.ndarray") -> float:
+    s = float(np.sum(pxx))
+    return float(np.sum(f * pxx) / (s + 1e-12)) if s > 0 else 0.0
+
+
+def _spectral_tilt(f: "np.ndarray", pxx: "np.ndarray") -> float:
+    """100Hz–10kHz 內 10log10(PSD) 對 log2(f) 線性回歸的斜率(dB/oct)。"""
+    m = (f >= 100.0) & (f <= 10000.0) & (pxx > 0)
+    if np.count_nonzero(m) < 4:
+        return 0.0
+    x = np.log2(f[m])
+    y = 10.0 * np.log10(pxx[m])
+    a = np.vstack([x, np.ones_like(x)]).T
+    slope = np.linalg.lstsq(a, y, rcond=None)[0][0]
+    return float(slope)
+
+
+def _log_smooth(curve: "np.ndarray", logf: "np.ndarray", frac: float = 1.0 / 6.0) -> "np.ndarray":
+    """在 log-freq 上做 ±frac 八度的箱型平滑(讓繪圖曲線乾淨)。"""
+    n = curve.shape[0]
+    out = np.empty_like(curve)
+    lg = np.log2(logf)
+    for i in range(n):
+        m = np.abs(lg - lg[i]) <= frac
+        out[i] = float(np.mean(curve[m])) if np.any(m) else curve[i]
+    return out
+
+
+def _spectrum_curve(mono: "np.ndarray", sr: int, logf: "np.ndarray") -> "np.ndarray":
+    """於 logf 點上取出時間平均、log-八度平滑後的量值曲線(原始 dB,未正規化)。"""
+    f, pxx = _welch_psd(mono, sr)
+    valid = f > 0
+    db = 10.0 * np.log10(pxx[valid] + 1e-12)
+    curve = np.interp(np.log10(logf), np.log10(f[valid]), db)
+    return _log_smooth(curve, logf)
+
+
+def _energy_envelope(mono: "np.ndarray", sr: int, hop_s: float, win_s: float) -> tuple["np.ndarray", "np.ndarray"]:
+    """短時能量包絡(dB)+ 時間軸(秒)。向量化(平方累積和)。"""
+    n = mono.shape[0]
+    hop = max(1, int(hop_s * sr))
+    half = max(hop, int(win_s * sr / 2))
+    centers = np.arange(0, n, hop)
+    csum = np.concatenate([[0.0], np.cumsum(mono.astype(np.float64) ** 2)])
+    a = np.clip(centers - half, 0, n)
+    b = np.clip(centers + half, 0, n)
+    ms = (csum[b] - csum[a]) / np.maximum(1, (b - a))
+    env_db = 20.0 * np.log10(np.sqrt(ms + 1e-12) + 1e-9)
+    times = centers / float(sr)
+    return times, env_db
+
+
+def _section_gain_db(env_db: "np.ndarray", amount: float, hop_s: float, max_db: float = 5.0) -> "np.ndarray":
+    """以能量包絡推出的區段增益(dB)—— 與 _macro_dynamics 同公式,供視覺化呈現。"""
+    if env_db.size == 0:
+        return env_db
+    dev = env_db - np.median(env_db)
+    gain = np.clip(float(amount) * 0.6 * dev, -max_db, max_db)
+    return uniform_filter1d(gain, size=max(3, int(2.0 / max(hop_s, 1e-3))))
+
+
+def _detect_sections(times: "np.ndarray", env_db: "np.ndarray", hop_s: float,
+                     min_len_s: float = 4.0) -> list[dict[str, Any]]:
+    """以能量包絡偵測 副歌(較大聲)/主歌(較小聲)區段;併掉過短段。"""
+    if env_db.size == 0:
+        return []
+    thr = float(np.median(env_db)) + 2.0
+    hi = env_db > thr
+    runs: list[list] = []
+    start = 0
+    cur = bool(hi[0])
+    for i in range(1, hi.shape[0]):
+        if bool(hi[i]) != cur:
+            runs.append([float(times[start]), float(times[i]), "chorus" if cur else "verse"])
+            start = i
+            cur = bool(hi[i])
+    end_t = float(times[-1]) + hop_s
+    runs.append([float(times[start]), end_t, "chorus" if cur else "verse"])
+    merged: list[list] = []
+    for s in runs:
+        if merged and (s[1] - s[0]) < min_len_s:
+            merged[-1][1] = s[1]
+        else:
+            merged.append(list(s))
+    if len(merged) >= 2 and (merged[0][1] - merged[0][0]) < min_len_s:
+        merged[1][0] = merged[0][0]
+        merged.pop(0)
+    return [{"start_s": round(a, 2), "end_s": round(b, 2), "type": t} for a, b, t in merged]
+
+
+def _highpass(data: "np.ndarray", sr: int, fc: float) -> "np.ndarray":
+    if fc <= 0:
+        return data
+    sos = sps.butter(2, min(fc / (sr / 2.0), 0.99), btype="high", output="sos")
+    out = np.empty_like(data)
+    for ch in range(data.shape[1]):
+        out[:, ch] = sps.sosfilt(sos, data[:, ch])
+    return out
+
+
+def _mono_below(data: "np.ndarray", sr: int, fc: float) -> "np.ndarray":
+    """把 fc 以下的 side 訊號收掉 → 低頻單聲道(club/vinyl 穩定)。"""
+    if fc <= 0 or data.shape[1] < 2:
+        return data
+    sos = sps.butter(4, min(fc / (sr / 2.0), 0.99), btype="low", output="sos")
+    mid = 0.5 * (data[:, 0] + data[:, 1])
+    side = 0.5 * (data[:, 0] - data[:, 1])
+    side_low = sps.sosfilt(sos, side)
+    side_hi = side - side_low  # 低頻 side 移除 → 低頻 mono
+    out = np.empty_like(data)
+    out[:, 0] = mid + side_hi
+    out[:, 1] = mid - side_hi
+    return out
+
+
+def _sev(margin: float, lo: float, med: float, hi: float) -> Optional[str]:
+    a = abs(margin)
+    if a >= hi:
+        return "high"
+    if a >= med:
+        return "medium"
+    if a >= lo:
+        return "low"
+    return None
+
+
+def _detect_problems(band_dev: dict[str, float], dyn: dict[str, float],
+                     spec: dict[str, float], stereo: dict[str, float]) -> list[dict[str, Any]]:
+    """度量 → 問題清單(id/severity/area/message/action/metrics)。中英訊息。"""
+    P: list[dict[str, Any]] = []
+
+    def add(_id, sev, area, zh, en, act_zh, act_en, **metrics):
+        if sev is None:
+            return
+        P.append({"id": _id, "severity": sev, "area": area,
+                  "message": zh, "messageEn": en, "action": act_zh, "actionEn": act_en,
+                  "metrics": metrics})
+
+    lm = band_dev.get("low_mid", 0.0)
+    add("muddy", _sev(lm - 2.5, 0.0, 1.5, 3.5) if lm > 2.5 else None, "low_mid",
+        "低中頻(200–400Hz)堆積 —— 聽起來糊、悶。", "Low-mid buildup (200–400Hz) — muddy/congested.",
+        "在 ~250Hz 衰減低中頻。", "Cut low-mids around 250 Hz.", deviation_db=round(lm, 1))
+
+    hm = band_dev.get("high_mid", 0.0)
+    add("harsh", _sev(hm - 3.0, 0.0, 2.0, 4.0) if hm > 3.0 else None, "high_mid",
+        "2–5kHz 過衝 —— 刺耳、聽久疲勞。", "Harsh 2–5 kHz — fatiguing.",
+        "在 ~3.5kHz 衰減。", "Cut around 3.5 kHz.", deviation_db=round(hm, 1))
+
+    pres = band_dev.get("presence", 0.0)
+    add("sibilant", _sev(pres - 3.0, 0.0, 2.0, 4.0) if (pres > 3.0 and spec.get("centroid_hz", 0) > 3500) else None,
+        "presence", "5–8kHz 齒音/毛邊偏多。", "Sibilance/edge around 5–8 kHz.",
+        "窄帶在 6–7kHz 衰減。", "Narrow cut at 6–7 kHz.", deviation_db=round(pres, 1))
+
+    air = band_dev.get("air", 0.0)
+    add("dull_no_air", _sev(air, 3.0, 5.0, 7.0) if air < -3.0 else None, "air",
+        "10kHz 以上空氣感不足 —— 悶、不通透。", "Lacks air above 10 kHz — dull/closed.",
+        "在 12kHz 高棚微抬。", "High-shelf lift at 12 kHz.", deviation_db=round(air, 1))
+
+    tilt = spec.get("tilt_db_oct", -3.5)
+    add("dark", "low" if (tilt <= -6.0 or spec.get("centroid_hz", 2000) < 1200) else None, "tone",
+        "整體偏暗/悶。", "Overall tone is dark/dull.",
+        "高棚微抬、低中微修。", "Gentle high-shelf lift.", tilt_db_oct=round(tilt, 2))
+
+    bass = band_dev.get("bass", 0.0)
+    sub = band_dev.get("sub", 0.0)
+    add("boomy_low", _sev(max(bass - 3.0, sub - 4.0), 0.0, 1.5, 3.0) if (bass > 3.0 or sub > 4.0) else None,
+        "bass", "低頻過多 —— 轟、糊、不緊。", "Low end is boomy/bloated.",
+        "衰減低頻、必要時加低切。", "Cut bass; add a low-cut if sub-heavy.",
+        bass_db=round(bass, 1), sub_db=round(sub, 1))
+
+    add("thin_no_bass", _sev(bass, 3.0, 5.0, 7.0) if (bass < -3.0 and sub < -2.0) else None,
+        "bass", "低頻單薄 —— 缺乏重量。", "Thin — lacks low-end weight.",
+        "在 ~90Hz 低棚微抬。", "Low-shelf lift at ~90 Hz.", bass_db=round(bass, 1))
+
+    crest = dyn.get("crest_factor_db", 12.0)
+    dr = dyn.get("dr_est")
+    plr = dyn.get("plr", 12.0)
+    lra = dyn.get("lra_lu", 6.0)
+    over = (crest < 7.0) or (dr is not None and dr <= 6) or (plr <= 6.0) or (lra < 3.0)
+    add("over_compressed", ("high" if crest < 5.0 else "medium") if over else None, "dynamics",
+        "過度壓縮 —— 扁平、沒有衝擊力。", "Over-compressed — flat, no punch.",
+        "降低壓縮;用「爆發力(+)」恢復副歌動態。", "Reduce compression; raise section punch (+).",
+        crest_db=round(crest, 1), dr=dr, plr=round(plr, 1))
+
+    tp = dyn.get("true_peak_dbtp", -1.0)
+    add("clipping", "high" if tp > 0.0 else None, "loudness",
+        "破音/真峰超過 0dB —— 轉檔會失真。", "Clipping / inter-sample peaks over 0 dB.",
+        "啟用真峰限幅到 -1 dBTP。", "Limit true-peak to -1 dBTP.", true_peak_dbtp=round(tp, 2))
+
+    corr = stereo.get("correlation", 0.5)
+    wi = stereo.get("width_index", 0.4)
+    add("too_narrow", "low" if (wi < 0.12 or corr > 0.95) else None, "stereo",
+        "立體聲偏窄/接近單聲道。", "Image is narrow / almost mono.",
+        "加寬立體聲(保持低頻單聲道)。", "Widen the stereo image (keep bass mono).",
+        width_index=round(wi, 2), correlation=round(corr, 2))
+
+    add("too_wide_phase", ("high" if corr < 0.0 else "medium") if (wi > 1.0 or corr < 0.0) else None, "stereo",
+        "過寬/相位抵銷 —— 單聲道播放會掉能量。", "Too wide / phase cancellation — mono loses energy.",
+        "收窄立體聲、檢查極性。", "Narrow the width; check polarity.",
+        width_index=round(wi, 2), correlation=round(corr, 2))
+
+    lmc = stereo.get("low_mono_corr", 1.0)
+    add("low_end_not_mono", _sev(0.4 - lmc, 0.0, 0.2, 0.4) if lmc < 0.4 else None, "stereo",
+        "低頻不是單聲道 —— club/黑膠會不穩。", "Bass isn't mono — unstable on club/vinyl.",
+        "在 120–150Hz 以下收成單聲道。", "Mono the low end below ~150 Hz.", low_mono_corr=round(lmc, 2))
+
+    rank = {"high": 0, "medium": 1, "low": 2}
+    P.sort(key=lambda p: rank.get(p["severity"], 3))
+    return P
+
+
+def _auto_corrections(band_dev: dict[str, float], dyn: dict[str, float],
+                      stereo: dict[str, float], genre: str,
+                      strength: float = 0.7) -> dict[str, Any]:
+    """由分析推出自動修正設定(EQ band gains、低切、寬度、壓縮量、區段動態、響度目標)。
+
+    strength = 自動校正「力度」(0.2 自然 … 1.0 強力)—— 當作修正 EQ 的信任係數:
+    越低越保守(只做小幅修正、最自然),越高越貼近目標曲線(修正更明顯)。同時
+    線性地調節寬度/區段動態的修正幅度,維持「夠好但不過頭」。
+    """
+    trust = float(np.clip(strength, 0.2, 1.0))
+    # 每段修正 = 夾在 ±6dB 的 (目標−實測),再乘信任係數(寧可略修不過修)
+    gains = {b: round(float(np.clip(-band_dev.get(b, 0.0), -6.0, 6.0)) * trust, 1) for b, _, _ in _BANDS}
+
+    sub = band_dev.get("sub", 0.0)
+    low_cut = 0
+    if sub > 4.0:
+        low_cut = 35
+    if sub > 7.0:
+        low_cut = 45
+
+    lmc = stereo.get("low_mono_corr", 1.0)
+    mono_below = 150 if lmc < 0.4 else 0
+
+    crest = dyn.get("crest_factor_db", 12.0)
+    dr = dyn.get("dr_est")
+    lra = dyn.get("lra_lu", 6.0)
+    if crest < 7.0 or (dr is not None and dr <= 6):
+        comp_amount = 0.0
+    else:
+        comp_amount = 0.0
+        if crest > 14.0:
+            comp_amount += 0.5
+        elif crest > 11.0:
+            comp_amount += 0.3
+        if lra > 12.0:
+            comp_amount += 0.3
+        elif lra > 9.0:
+            comp_amount += 0.15
+        comp_amount = float(np.clip(comp_amount, 0.0, 0.8))
+
+    corr = stereo.get("correlation", 0.5)
+    wi = stereo.get("width_index", 0.4)
+    if corr < 0.0:
+        width = 0.8
+    elif wi > 1.0:
+        width = 0.85
+    elif wi < 0.12 or corr > 0.95:
+        width = 1.3
+    elif wi < 0.25:
+        width = 1.15
+    else:
+        width = 1.0
+
+    if crest < 7.0 or (dr is not None and dr <= 6):
+        section = 0.4
+    elif lra > 13.0:
+        section = -0.3
+    else:
+        section = 0.15
+
+    if genre in ("edm", "hiphop"):
+        loud = "social"
+    elif genre in ("rock", "pop", "rnb"):
+        loud = "balanced"
+    else:
+        loud = "streaming"
+
+    # 用力度同步調節寬度/壓縮/區段動態的修正幅度(以 0.7 為基準 → 1.0 倍,維持原行為)。
+    sf = float(np.clip(trust / 0.7, 0.0, 1.2))
+    width = 1.0 + (width - 1.0) * sf
+    comp_amount = comp_amount * sf
+    section = section * sf
+
+    return {
+        "eq_band_gains_db": gains,
+        "low_cut_hz": low_cut,
+        "mono_below_hz": mono_below,
+        "comp_amount": round(comp_amount, 2),
+        "width_factor": round(float(width), 2),
+        "loudness": loud,
+        "tp_ceiling_dbtp": -1.0,
+        "section_amount": round(float(section), 2),
+        "trust": round(trust, 2),
+    }
+
+
+def analyze(data: "np.ndarray", sr: int, *, genre: str = "auto",
+            section_amount: Optional[float] = None, strength: float = 0.7) -> dict:
+    """整首歌的智慧分析:響度/動態/頻譜/立體聲 + 問題清單 + 自動修正 + 視覺化資料。
+
+    回傳結構見 README/前端 MasterAnalysis 型別。任一度量失敗都以安全值降級,不丟例外。
+    """
+    if not _HAS_DSP:
+        raise RuntimeError("母帶 DSP 相依不可用(需 scipy + pyloudnorm)")
+
+    data = _to_stereo(np.asarray(data, dtype=np.float64))
+    dur_s = round(data.shape[0] / float(sr), 2) if sr else 0.0
+    xa, asr = _analysis_signal(data, sr)
+    mono = np.mean(xa, axis=1)
+
+    # ── 響度 ──────────────────────────────────────────────
+    integrated = _measure_lufs(xa, asr)
+    st = _sliding_loudness(xa, asr, 3.0, hop_s=0.5)
+    mom = _sliding_loudness(xa, asr, 0.4, hop_s=0.1)
+    short_term_max = float(np.max(st)) if st.size else integrated
+    momentary_max = float(np.max(mom)) if mom.size else integrated
+    lra = _lra(_sliding_loudness(xa, asr, 3.0, hop_s=0.1))
+    true_peak = _true_peak_dbtp(data, sr)
+    sample_peak = _peak_db(xa)
+
+    # ── 動態 ──────────────────────────────────────────────
+    rms = float(np.sqrt(np.mean(xa ** 2) + 1e-12))
+    rms_db = 20.0 * np.log10(rms + 1e-12)
+    crest = sample_peak - rms_db
+    plr = true_peak - integrated
+    # PSR(3s 視窗:視窗峰值 - 短時響度的中位數)
+    try:
+        run_pk = maximum_filter1d(np.max(np.abs(xa), axis=1), size=max(1, int(3 * asr)))
+        hopn = max(1, int(0.5 * asr))
+        pk_s = 20.0 * np.log10(run_pk[::hopn][:st.size] + 1e-12)
+        psr = float(np.median(pk_s - st)) if st.size else 0.0
+    except Exception:
+        psr = crest
+    dr_est = _estimate_dr(mono, asr)
+
+    dyn = {"crest_factor_db": crest, "plr": plr, "psr": psr, "dr_est": dr_est,
+           "lra_lu": lra, "true_peak_dbtp": true_peak}
+
+    # ── 頻譜 ──────────────────────────────────────────────
+    f, pxx = _welch_psd(mono, asr)
+    band_db = _band_levels_db(f, pxx)
+    centroid = _spectral_centroid(f, pxx)
+    tilt = _spectral_tilt(f, pxx)
+    spec = {"centroid_hz": centroid, "tilt_db_oct": tilt}
+
+    # 正規化頻段(去掉整體響度,只比形狀)→ 與目標的偏差
+    meas_mean = float(np.mean(list(band_db.values())))
+    tgt_levels = _target_band_levels(genre)
+    tgt_mean = float(np.mean(list(tgt_levels.values())))
+    band_dev = {b: (band_db[b] - meas_mean) - (tgt_levels[b] - tgt_mean) for b, _, _ in _BANDS}
+
+    # ── 立體聲 ────────────────────────────────────────────
+    L, R = xa[:, 0], xa[:, 1]
+    mid = 0.5 * (L + R)
+    side = 0.5 * (L - R)
+    rms_mid = float(np.sqrt(np.mean(mid ** 2) + 1e-12))
+    rms_side = float(np.sqrt(np.mean(side ** 2) + 1e-12))
+    denom = float(np.sqrt(np.sum(L ** 2) * np.sum(R ** 2)) + 1e-12)
+    correlation = float(np.sum(L * R) / denom)
+    width_index = float(rms_side / (rms_mid + 1e-12))
+    ms_balance = 20.0 * np.log10((rms_side + 1e-12) / (rms_mid + 1e-12))
+    try:
+        sos = sps.butter(4, min(150.0 / (asr / 2.0), 0.99), btype="low", output="sos")
+        Ll = sps.sosfilt(sos, L)
+        Rl = sps.sosfilt(sos, R)
+        ld = float(np.sqrt(np.sum(Ll ** 2) * np.sum(Rl ** 2)) + 1e-12)
+        low_mono_corr = float(np.sum(Ll * Rl) / ld)
+    except Exception:
+        low_mono_corr = correlation
+    stereo = {"correlation": correlation, "width_index": width_index,
+              "ms_balance_db": ms_balance, "low_mono_corr": low_mono_corr,
+              "mono_compatible": correlation > 0.1}
+
+    # ── 問題 + 自動修正 ───────────────────────────────────
+    problems = _detect_problems(band_dev, dyn, spec, stereo)
+    corrections = _auto_corrections(band_dev, dyn, stereo, genre, strength)
+    sec_amt = corrections["section_amount"] if section_amount is None else float(section_amount)
+
+    # ── 繪圖:頻譜曲線(before / target / 預測 after)──────
+    fmax = min(20000.0, asr / 2.0 - 1.0)
+    logf = np.geomspace(20.0, fmax, 160)
+    before_raw = _spectrum_curve(mono, asr, logf)
+    # 修正用 EQ 曲線(由各頻段 gain 在 log-freq 內插,平滑)
+    centers = np.array([_BAND_EQ[b][1] for b, _, _ in _BANDS])
+    cg = np.array([corrections["eq_band_gains_db"][b] for b, _, _ in _BANDS])
+    eq_delta = np.interp(np.log10(logf), np.log10(centers), cg, left=cg[0], right=cg[-1])
+    eq_delta = _log_smooth(eq_delta, logf, frac=1.0 / 3.0)
+    after_raw = before_raw + eq_delta
+    tgt_raw = _target_curve_db(logf)
+    ref0 = float(np.max(before_raw))
+    spectrum = {
+        "freqs": [round(float(v), 1) for v in logf],
+        "before_db": [round(float(v - ref0), 1) for v in before_raw],
+        "after_db": [round(float(v - ref0), 1) for v in after_raw],
+        "target_db": [round(float(v - float(np.max(tgt_raw))), 1) for v in tgt_raw],
+    }
+
+    bands_out = []
+    for b, lo, hi in _BANDS:
+        bands_out.append({
+            "name": b, "lo": lo, "hi": hi,
+            "measured_db": round(band_db[b] - meas_mean, 1),
+            "target_db": round(tgt_levels[b] - tgt_mean, 1),
+            "deviation_db": round(band_dev[b], 1),
+            "eq_gain_db": corrections["eq_band_gains_db"][b],
+        })
+
+    # ── 區段動態(主歌/副歌)+ 套用中的增益曲線 ──────────
+    times, env_db = _energy_envelope(mono, asr, hop_s=0.5, win_s=1.0)
+    segments = _detect_sections(times, env_db, hop_s=0.5)
+    gain_curve = _section_gain_db(env_db, sec_amt, hop_s=0.5)
+    sections = {
+        "times_s": [round(float(v), 2) for v in times],
+        "energy_db": [round(float(v), 1) for v in env_db],
+        "segments": segments,
+        "gain_curve_db": [round(float(v), 2) for v in gain_curve],
+        "amount": round(float(sec_amt), 3),
+    }
+
+    score = 100 - sum({"high": 15, "medium": 7, "low": 3}.get(p["severity"], 0) for p in problems)
+    score = int(max(0, min(100, score)))
+
+    _out = {
+        "sr": asr,
+        "duration_s": dur_s,
+        "genre": genre,
+        "spectrum": spectrum,
+        "bands": bands_out,
+        "sections": sections,
+        "loudness": {
+            "integrated_lufs": round(integrated, 1),
+            "short_term_max_lufs": round(short_term_max, 1),
+            "momentary_max_lufs": round(momentary_max, 1),
+            "lra_lu": round(lra, 1),
+            "true_peak_dbtp": round(true_peak, 2),
+            "sample_peak_dbfs": round(sample_peak, 2),
+        },
+        "dynamics": {
+            "crest_factor_db": round(crest, 1),
+            "plr": round(plr, 1),
+            "psr": round(psr, 1),
+            "dr_est": dr_est,
+            "rms_db": round(rms_db, 1),
+        },
+        "spectral": {"centroid_hz": round(centroid, 0), "tilt_db_oct": round(tilt, 2)},
+        "stereo": {
+            "correlation": round(correlation, 2),
+            "width_index": round(width_index, 2),
+            "ms_balance_db": round(ms_balance, 1),
+            "low_mono_corr": round(low_mono_corr, 2),
+            "mono_compatible": bool(correlation > 0.1),
+        },
+        "problems": problems,
+        "corrections": corrections,
+        "overall_score": score,
+    }
+    return _finite_scrub(_out)
+
+
+def _estimate_dr(mono: "np.ndarray", sr: int) -> Optional[int]:
+    """TT-DR 風格估計:取最大聲 20% 區塊,峰值/RMS 比(dB)。資料不足回 None。"""
+    w = max(1, int(3 * sr))
+    n = mono.shape[0]
+    if n < 3 * w:
+        return None
+    starts = range(0, n - w, w)
+    rms_list = []
+    pk_list = []
+    for i in starts:
+        blk = mono[i:i + w]
+        rms_list.append(float(np.sqrt(np.mean(blk ** 2) + 1e-12)))
+        pk_list.append(float(np.max(np.abs(blk)) + 1e-12))
+    if len(rms_list) < 3:
+        return None
+    rms_a = np.array(rms_list)
+    pk_a = np.array(pk_list)
+    idx = np.argsort(rms_a)[-max(1, len(rms_a) // 5):]
+    rms_top = float(np.sqrt(np.mean(rms_a[idx] ** 2)))
+    pk_top = float(np.mean(pk_a[idx]))
+    return int(round(20.0 * np.log10(pk_top / (rms_top + 1e-12) + 1e-12)))
+
+
+def analyze_file(path: str, *, genre: str = "auto", strength: float = 0.7) -> dict:
+    """讀檔 + analyze()。供 /api/master/analyze 直接呼叫。"""
+    if not _HAS_DSP:
+        raise RuntimeError("母帶 DSP 相依不可用(需 scipy + pyloudnorm)")
+    data, sr = _load_audio(path)
+    return analyze(data, sr, genre=genre, strength=strength)
+
+
 # --------------------------------------------------------------------------- #
 # 主流程
 # --------------------------------------------------------------------------- #
@@ -425,6 +1105,9 @@ def master(
     eq: Optional[dict] = None,
     comp_scale: float = 1.0,
     ceiling_db: Optional[float] = None,
+    auto: bool = False,
+    auto_strength: float = 0.7,
+    analyze_result: bool = True,
     progress: Optional[ProgressFn] = None,
 ) -> dict:
     """把 input 處理成母帶寫到 output(24-bit WAV)。回傳量測/設定摘要 dict。
@@ -435,6 +1118,11 @@ def master(
       eq         {"bass","lowMid","presence","air"} 額外 dB,疊加在曲風/參考 EQ 上
       comp_scale 壓縮強度倍率(0=不壓、1=預設、2=加倍)
       ceiling_db 真峰天花板覆寫(否則用 loudness 目標的 -1 dBTP)
+      auto       智慧模式:先分析這首歌,套資料驅動的修正 EQ + 低切 + 自動寬度/壓縮/
+                 區段動態當基底,使用者的手動參數再疊加/覆寫在上面。
+      auto_strength 自動校正力度 0.2(自然)..1.0(強力),預設 0.7。越低修正越保守、
+                 越自然;越高越貼近目標曲線。
+      analyze_result 是否在回傳裡附上 before/after 分析(供前端視覺化 A/B)。
     """
     if not _HAS_DSP:
         raise RuntimeError("母帶 DSP 相依不可用(需 scipy + pyloudnorm)")
@@ -448,34 +1136,72 @@ def master(
     in_lufs = _measure_lufs(data, sr)
     in_peak = _peak_db(data)
 
-    # 1) 音色:參考曲匹配 或 曲風 EQ,再疊上進階手動 EQ
+    # 智慧分析(auto 或要回傳 before 分析時跑)
+    analysis_before: Optional[dict] = None
+    corr: Optional[dict] = None
+    if auto or analyze_result:
+        try:
+            analysis_before = analyze(data, sr, genre=genre, strength=auto_strength)
+            corr = analysis_before.get("corrections")
+        except Exception:
+            logger.warning("智慧分析失敗,改用曲風預設(降級)", exc_info=True)
+            analysis_before = None
+            corr = None
+
+    # 1) 音色:參考曲匹配 > 智慧修正 EQ > 曲風 EQ,再疊上進階手動 EQ
     ref_used = False
     if reference_path and os.path.isfile(reference_path):
         _emit(progress, 22.0, "比對參考曲音色 · Matching reference")
         ref, rsr = _load_audio(reference_path)
         data = _match_eq(data, sr, ref, rsr)
         ref_used = True
+    elif auto and corr:
+        _emit(progress, 22.0, "智慧修正音色 · Smart corrective EQ")
+        bands: list[tuple] = []
+        for name, (kind, f0, q) in _BAND_EQ.items():
+            g = float(corr["eq_band_gains_db"].get(name, 0.0))
+            if abs(g) > 1e-3:
+                bands.append((kind, f0, g, q))
+        data = _apply_eq(data, sr, bands)
+        if corr.get("low_cut_hz", 0) > 0:
+            data = _highpass(data, sr, float(corr["low_cut_hz"]))
+        if corr.get("mono_below_hz", 0) > 0:
+            data = _mono_below(data, sr, float(corr["mono_below_hz"]))
     else:
         _emit(progress, 22.0, f"套用曲風 EQ · {preset['label']}")
         data = _apply_eq(data, sr, preset["eq"])
     if eq:
         data = _advanced_eq(data, sr, eq)
 
-    # 2) 壓縮膠合(comp_scale 縮放強度:把 ratio 往 1 拉或放大)
+    # 2) 壓縮膠合(comp_scale 縮放強度;auto 模式把建議壓縮量折進基底倍率)。
+    #    auto 偵測到「已過度壓縮」(comp_amount=0)時完全不再壓縮 —— 否則會與
+    #    自己的診斷「應降低壓縮」自相矛盾(0.5 基底會殘留約 1.3 的壓縮比)。
     _emit(progress, 45.0, "動態壓縮 · Compression")
     comp = dict(preset["comp"])
     cs = max(0.0, float(comp_scale))
-    comp["ratio"] = 1.0 + (comp["ratio"] - 1.0) * cs
-    comp["makeup_db"] = comp["makeup_db"] * cs
-    data = _compress(data, sr, **comp)
+    if auto and corr:
+        ca = float(corr.get("comp_amount", 0.0))
+        cs = cs * (0.5 + ca) if ca > 1e-6 else 0.0
+    if cs > 1e-6:
+        comp["ratio"] = 1.0 + (comp["ratio"] - 1.0) * cs
+        comp["makeup_db"] = comp["makeup_db"] * cs
+        data = _compress(data, sr, **comp)
 
-    # 3) 區段感知巨觀動態(主歌/副歌自動增減)
-    if abs(float(dynamics)) > 1e-3:
+    # 3) 區段感知巨觀動態(主歌/副歌自動增減);auto 模式在使用者未指定時用建議量
+    dyn_eff = float(dynamics)
+    if auto and corr and abs(dyn_eff) <= 1e-3:
+        dyn_eff = float(corr.get("section_amount", 0.0))
+    if abs(dyn_eff) > 1e-3:
         _emit(progress, 60.0, "區段動態 · Macro dynamics")
-        data = _macro_dynamics(data, sr, float(dynamics))
+        data = _macro_dynamics(data, sr, dyn_eff)
 
-    # 4) 立體聲寬度
-    w = float(width) if width is not None else float(preset["width"])
+    # 4) 立體聲寬度(明確 width > auto 建議 > 曲風預設)
+    if width is not None:
+        w = float(width)
+    elif auto and corr:
+        w = float(corr.get("width_factor", preset["width"]))
+    else:
+        w = float(preset["width"])
     data = _stereo_width(data, w)
 
     # 5) 響度正規化到目標(微推 0.3,補限幅器的些微響度損失,但寧可略低於目標也不超過)。
@@ -494,6 +1220,16 @@ def master(
     out_lufs = _measure_lufs(data, sr)
     out_peak = _peak_db(data)
 
+    # 處理後分析(供前端 A/B 視覺化:套用的區段動態用 dyn_eff 呈現增益曲線)
+    analysis_after: Optional[dict] = None
+    if analyze_result:
+        _emit(progress, 92.0, "分析母帶結果 · Analyzing result")
+        try:
+            analysis_after = analyze(data, sr, genre=genre, section_amount=dyn_eff)
+        except Exception:
+            logger.warning("結果分析失敗(降級,不影響輸出)", exc_info=True)
+            analysis_after = None
+
     _emit(progress, 95.0, "輸出 24-bit WAV · Exporting")
     _write_wav(output_path, data, sr)
 
@@ -503,13 +1239,17 @@ def master(
         "sampleRate": sr,
         "genre": genre,
         "loudness": loudness,
+        "auto": bool(auto),
+        "autoStrength": round(float(auto_strength), 2),
         "referenceUsed": ref_used,
         "width": round(w, 3),
-        "dynamics": round(float(dynamics), 3),
+        "dynamics": round(dyn_eff, 3),
         "inputLufs": round(in_lufs, 2),
         "outputLufs": round(out_lufs, 2),
         "targetLufs": tgt_lufs,
         "inputPeakDb": round(in_peak, 2),
         "outputPeakDb": round(out_peak, 2),
         "ceilingDb": round(ceil, 2),
+        "before": analysis_before,
+        "after": analysis_after,
     }

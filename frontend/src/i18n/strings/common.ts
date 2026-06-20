@@ -119,6 +119,77 @@ export const common: Record<string, Entry> = {
   'master.adv.ceiling': { zh: '真峰天花板', en: 'True-peak ceiling' },
   'master.adv.reset': { zh: '重設進階', en: 'Reset advanced' },
 
+  // ── Smart analysis (intelligent auto-mastering) ──
+  'master.section.analysis': { zh: '智慧分析', en: 'Smart analysis' },
+  'master.analyzing': { zh: '分析這首歌中…', en: 'Analyzing this track…' },
+
+  // Auto-mode transparency banner
+  'master.auto.title': { zh: '🪄 智慧自動將套用', en: '🪄 Auto will apply' },
+  'master.auto.clean': { zh: '這首歌已相當均衡 —— 只做輕微優化與響度校正。', en: 'This track is already well-balanced — only light polish + loudness.' },
+  'master.auto.lowcut': { zh: '低切', en: 'Low-cut' },
+  'master.auto.monobass': { zh: '低頻單聲', en: 'Mono bass' },
+  'master.auto.width': { zh: '寬度', en: 'Width' },
+
+  // Auto-correction strength dial
+  'master.strength.label': { zh: '自動校正力度', en: 'Auto-correction strength' },
+  'master.strength.natural': { zh: '自然', en: 'Natural' },
+  'master.strength.balanced': { zh: '平衡', en: 'Balanced' },
+  'master.strength.strong': { zh: '強力', en: 'Strong' },
+  'master.strength.hint': {
+    zh: '越自然 = 修正越輕、越保留原味;越強力 = 越貼近「理想母帶」的頻率平衡。',
+    en: 'Natural = lighter, keeps your character; Strong = pushes closer to the ideal target balance.',
+  },
+
+  // Band labels
+  'master.band.sub': { zh: '超低', en: 'Sub' },
+  'master.band.bass': { zh: '低頻', en: 'Bass' },
+  'master.band.lowMid': { zh: '低中', en: 'Lo-mid' },
+  'master.band.mid': { zh: '中頻', en: 'Mid' },
+  'master.band.highMid': { zh: '高中', en: 'Hi-mid' },
+  'master.band.presence': { zh: '臨場', en: 'Presence' },
+  'master.band.air': { zh: '空氣', en: 'Air' },
+
+  // Analysis panel block titles
+  'master.an.metrics': { zh: '專業量測', en: 'Pro metrics' },
+  'master.an.spectrum': { zh: '頻譜', en: 'Spectrum' },
+  'master.an.bands': { zh: '頻段平衡', en: 'Band balance' },
+  'master.an.sections': { zh: '區段動態（主歌／副歌）', en: 'Section dynamics' },
+  'master.an.compare': { zh: '處理前後頻譜', en: 'Before → after spectrum' },
+  'master.an.finalMetrics': { zh: '母帶量測', en: 'Master metrics' },
+  'master.an.scoreDelta': { zh: '分數', en: 'score' },
+
+  // Viz labels / aria
+  'master.viz.before': { zh: '原始', en: 'Original' },
+  'master.viz.predicted': { zh: '預測', en: 'Predicted' },
+  'master.viz.target': { zh: '目標', en: 'Target' },
+  'master.viz.spectrumAria': { zh: '頻譜曲線', en: 'Frequency spectrum' },
+  'master.viz.bandsAria': { zh: '頻段平衡長條圖', en: 'Band balance bars' },
+  'master.viz.sectionsAria': { zh: '區段能量與增益', en: 'Section energy and gain' },
+
+  // Metric cards
+  'master.metric.loudness': { zh: '整合響度', en: 'Loudness' },
+  'master.metric.integrated': { zh: 'Integrated', en: 'Integrated' },
+  'master.metric.lra': { zh: '響度範圍', en: 'Loudness range' },
+  'master.metric.lraSub': { zh: 'LRA · 動態幅度', en: 'LRA · dynamics' },
+  'master.metric.truePeak': { zh: '真峰', en: 'True peak' },
+  'master.metric.truePeakSub': { zh: '≤ −1 安全', en: '≤ −1 safe' },
+  'master.metric.dynamics': { zh: '動態', en: 'Dynamics' },
+  'master.metric.crest': { zh: '波峰因數', en: 'Crest' },
+  'master.metric.stereo': { zh: '立體聲', en: 'Stereo' },
+  'master.metric.correlation': { zh: '相關性', en: 'Correlation' },
+  'master.metric.lowMono': { zh: '低頻單聲', en: 'Bass mono' },
+  'master.metric.lowMonoSub': { zh: '<150Hz 相關', en: '<150Hz corr.' },
+
+  // Diagnosis (score + problems)
+  'master.diag.score': { zh: '分', en: 'score' },
+  'master.diag.clean': { zh: '太棒了 —— 沒偵測到明顯問題。', en: 'Great — no notable issues detected.' },
+
+  // Section dynamics legend
+  'master.sect.chorus': { zh: '副歌', en: 'Chorus' },
+  'master.sect.verse': { zh: '主歌', en: 'Verse' },
+  'master.sect.energy': { zh: '能量', en: 'Energy' },
+  'master.sect.applied': { zh: '套用增益', en: 'Applied gain' },
+
   // ── Window controls (titlebar) ──
   'common.window.minimize': { zh: '最小化', en: 'Minimize' },
   'common.window.maximize': { zh: '最大化', en: 'Maximize' },

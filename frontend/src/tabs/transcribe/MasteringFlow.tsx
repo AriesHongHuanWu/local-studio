@@ -12,14 +12,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Disc3, UploadCloud, Sparkles, Download, Loader2, Music2,
-  SlidersHorizontal, ChevronRight, ChevronDown,
+  SlidersHorizontal, ChevronRight, ChevronDown, Gauge, Wand2,
 } from 'lucide-react';
 import { Button, Eyebrow } from '../../components/primitives';
-import { createMasterJob, getMasterJob, masterResultUrl } from '../../api/master';
-import type { MasterLoudness, MasterMeta } from '../../api/master';
+import { createMasterJob, getMasterJob, masterResultUrl, analyzeMaster } from '../../api/master';
+import type { MasterLoudness, MasterMeta, MasterAnalysis } from '../../api/master';
 import { ApiError } from '../../api/client';
 import { useMeta } from '../../state/useMeta';
 import { useT } from '../../i18n';
+import type { TFn } from '../../i18n';
+import { AnalysisPanel, ResultCompare } from './mastering/AnalysisPanel';
+import { fmtDb } from './mastering/vizUtils';
 import './mastering.css';
 
 const POLL_MS = 700;
@@ -30,6 +33,8 @@ const LOUDNESS: { key: MasterLoudness; lufs: string }[] = [
   { key: 'balanced', lufs: '−12 LUFS' },
   { key: 'social', lufs: '−9 LUFS' },
 ];
+
+const TARGET_LUFS: Record<string, number> = { streaming: -14, balanced: -12, social: -9 };
 
 export function MasteringFlow() {
   const t = useT();
@@ -43,6 +48,9 @@ export function MasteringFlow() {
   const [reference, setReference] = useState<File | null>(null);
   const [genre, setGenre] = useState('auto');
   const [loudness, setLoudness] = useState<MasterLoudness>('streaming');
+
+  // Auto-correction strength (0.2 natural ↔ 1.0 strong) for intelligent mode.
+  const [autoStrength, setAutoStrength] = useState(0.6);
 
   // Section macro-dynamics (−1 balance ↔ +1 punch) + advanced manual params.
   const [dynamics, setDynamics] = useState(0);
@@ -66,9 +74,17 @@ export function MasteringFlow() {
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [resultMeta, setResultMeta] = useState<MasterMeta | null>(null);
 
+  // Intelligent analysis (smart diagnosis) — best-effort, never blocks mastering.
+  const [analysis, setAnalysis] = useState<MasterAnalysis | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const analyzeAbort = useRef<AbortController | null>(null);
+
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stoppedRef = useRef(false);
 
+  // Revoke the previous object URL + stop any in-flight job poll when the
+  // source changes. (Analyze is NOT aborted here — it has its own controller
+  // and starts in the same render that changes srcUrl.)
   useEffect(() => {
     return () => {
       stoppedRef.current = true;
@@ -76,6 +92,36 @@ export function MasteringFlow() {
       if (srcUrl) URL.revokeObjectURL(srcUrl);
     };
   }, [srcUrl]);
+
+  // Unmount-only: abort any pending analysis request + clear debounce timer.
+  useEffect(() => {
+    return () => {
+      analyzeAbort.current?.abort();
+      if (strengthTimer.current) clearTimeout(strengthTimer.current);
+    };
+  }, []);
+
+  const strengthTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const runAnalyze = useCallback((f: File, g: string, strength: number) => {
+    if (meta.mastering === false) return;
+    analyzeAbort.current?.abort();
+    const ac = new AbortController();
+    analyzeAbort.current = ac;
+    setAnalyzing(true);
+    void (async () => {
+      try {
+        const a = await analyzeMaster(f, g, strength, ac.signal);
+        if (ac.signal.aborted) return;
+        setAnalysis(a);
+      } catch {
+        if (ac.signal.aborted) return;
+        setAnalysis(null); // analysis is optional; mastering still works
+      } finally {
+        if (!ac.signal.aborted) setAnalyzing(false);
+      }
+    })();
+  }, [meta.mastering]);
 
   const pickFile = useCallback((f: File | null) => {
     if (!f) return;
@@ -88,7 +134,24 @@ export function MasteringFlow() {
     setResultUrl(null);
     setResultMeta(null);
     setErrorMsg(null);
-  }, []);
+    setAnalysis(null);
+    runAnalyze(f, genre, autoStrength);
+  }, [genre, autoStrength, runAnalyze]);
+
+  const pickGenre = useCallback((g: string) => {
+    setGenre(g);
+    if (file) runAnalyze(file, g, autoStrength);
+  }, [file, autoStrength, runAnalyze]);
+
+  // Re-analyze (debounced) when the strength dial settles, so the panel +
+  // suggestion chips reflect the chosen aggressiveness.
+  const pickStrength = useCallback((v: number) => {
+    setAutoStrength(v);
+    if (strengthTimer.current) clearTimeout(strengthTimer.current);
+    if (file && genre === 'auto') {
+      strengthTimer.current = setTimeout(() => runAnalyze(file, genre, v), 350);
+    }
+  }, [file, genre, runAnalyze]);
 
   const poll = useCallback(
     async (id: string) => {
@@ -142,6 +205,8 @@ export function MasteringFlow() {
           eqAir,
           compScale,
           ceiling,
+          auto: genre === 'auto',
+          autoStrength,
         });
         if (stoppedRef.current) return;
         pollTimer.current = setTimeout(() => void poll(jobId), POLL_MS);
@@ -153,7 +218,7 @@ export function MasteringFlow() {
         setPhase('error');
       }
     })();
-  }, [file, genre, loudness, reference, dynamics, width, eqBass, eqLowMid, eqPresence, eqAir, compScale, ceiling, poll, t]);
+  }, [file, genre, loudness, reference, dynamics, width, eqBass, eqLowMid, eqPresence, eqAir, compScale, ceiling, autoStrength, poll, t]);
 
   const running = phase === 'running';
   const isDone = phase === 'done' && !!resultUrl;
@@ -191,9 +256,59 @@ export function MasteringFlow() {
         )}
       </section>
 
-      {/* 02 STYLE */}
+      {/* 02 SMART ANALYSIS */}
+      {(analyzing || analysis) && (
+        <section className="al-section">
+          <Eyebrow num={2}>
+            <span className="al-master__anhead"><Gauge size={13} /> {t('master.section.analysis')}</span>
+          </Eyebrow>
+          {analyzing && !analysis && (
+            <div className="al-master__analyzing">
+              <Loader2 size={15} className="al-spin" /> {t('master.analyzing')}
+            </div>
+          )}
+          {analysis && (
+            <>
+              {genre === 'auto' && (
+                <>
+                  <AutoSummary corrections={analysis.corrections} t={t} />
+                  <div className="al-master__strength">
+                    <div className="al-master__strengthhead">
+                      <span className="al-master__strengthlabel">{t('master.strength.label')}</span>
+                      <span className="al-master__strengthval">
+                        {autoStrength <= 0.4 ? t('master.strength.natural')
+                          : autoStrength >= 0.8 ? t('master.strength.strong')
+                            : t('master.strength.balanced')}
+                      </span>
+                    </div>
+                    <div className="al-master__strengthrow">
+                      <span className="al-master__dynend">{t('master.strength.natural')}</span>
+                      <input
+                        type="range"
+                        min={20}
+                        max={100}
+                        step={5}
+                        value={Math.round(autoStrength * 100)}
+                        onChange={(e) => pickStrength(Number(e.target.value) / 100)}
+                        className="al-master__range"
+                        disabled={running}
+                        aria-label={t('master.strength.label')}
+                      />
+                      <span className="al-master__dynend">{t('master.strength.strong')}</span>
+                    </div>
+                    <p className="al-master__hint">{t('master.strength.hint')}</p>
+                  </div>
+                </>
+              )}
+              <AnalysisPanel analysis={analysis} targetLufs={TARGET_LUFS[loudness]} />
+            </>
+          )}
+        </section>
+      )}
+
+      {/* 03 STYLE */}
       <section className="al-section">
-        <Eyebrow num={2}>{t('master.section.style')}</Eyebrow>
+        <Eyebrow num={3}>{t('master.section.style')}</Eyebrow>
         <p className="al-master__sub">{t('master.genreLabel')}</p>
         <div className="al-master__genres">
           {genres.map((g) => (
@@ -201,7 +316,7 @@ export function MasteringFlow() {
               key={g.key}
               type="button"
               className={`al-master__chip${genre === g.key ? ' al-master__chip--active' : ''}`}
-              onClick={() => setGenre(g.key)}
+              onClick={() => pickGenre(g.key)}
               disabled={running}
             >
               {g.label}
@@ -235,9 +350,9 @@ export function MasteringFlow() {
         <p className="al-master__hint">{t('master.refHint')}</p>
       </section>
 
-      {/* 03 LOUDNESS */}
+      {/* 04 LOUDNESS */}
       <section className="al-section">
-        <Eyebrow num={3}>{t('master.section.loudness')}</Eyebrow>
+        <Eyebrow num={4}>{t('master.section.loudness')}</Eyebrow>
         <div className="al-master__loudness">
           {LOUDNESS.map((l) => (
             <button
@@ -255,9 +370,9 @@ export function MasteringFlow() {
         </div>
       </section>
 
-      {/* 04 DYNAMICS — section-aware (verse/chorus) */}
+      {/* 05 DYNAMICS — section-aware (verse/chorus) */}
       <section className="al-section">
-        <Eyebrow num={4}>{t('master.section.dynamics')}</Eyebrow>
+        <Eyebrow num={5}>{t('master.section.dynamics')}</Eyebrow>
         <div className="al-master__dynrow">
           <span className="al-master__dynend">{t('master.dyn.balance')}</span>
           <input
@@ -344,7 +459,7 @@ export function MasteringFlow() {
       {/* RESULT */}
       {isDone && resultUrl && (
         <section className="al-section">
-          <Eyebrow num={4}>{t('master.section.result')}</Eyebrow>
+          <Eyebrow num={6}>{t('master.section.result')}</Eyebrow>
           <div className="al-master__result">
             <div className="al-master__player">
               <span className="al-master__playerlabel al-master__playerlabel--gold">
@@ -353,6 +468,14 @@ export function MasteringFlow() {
               {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
               <audio src={resultUrl} controls autoPlay className="al-master__audio" />
             </div>
+
+            {resultMeta?.before && resultMeta?.after && (
+              <ResultCompare
+                before={resultMeta.before}
+                after={resultMeta.after}
+                targetLufs={resultMeta.targetLufs}
+              />
+            )}
 
             {resultMeta && (
               <div className="al-master__stats">
@@ -424,6 +547,45 @@ function Stat({ label, value, sub }: { label: string; value: string; sub: string
       <span className="al-master__statlabel">{label}</span>
       <span className="al-master__statvalue">{value}</span>
       {sub && <span className="al-master__statsub">{sub}</span>}
+    </div>
+  );
+}
+
+const AUTO_BAND_LABEL: Record<string, string> = {
+  sub: 'master.band.sub',
+  bass: 'master.band.bass',
+  low_mid: 'master.band.lowMid',
+  mid: 'master.band.mid',
+  high_mid: 'master.band.highMid',
+  presence: 'master.band.presence',
+  air: 'master.band.air',
+};
+
+/** Transparent summary of what intelligent "Auto" mode will apply. */
+function AutoSummary({ corrections, t }: { corrections: MasterAnalysis['corrections']; t: TFn }) {
+  const chips: string[] = [];
+  for (const [b, g] of Object.entries(corrections.eq_band_gains_db)) {
+    if (Math.abs(g) >= 0.8) chips.push(`${t(AUTO_BAND_LABEL[b] ?? b)} ${fmtDb(g)}`);
+  }
+  if (corrections.low_cut_hz > 0) chips.push(`${t('master.auto.lowcut')} ${corrections.low_cut_hz}Hz`);
+  if (corrections.mono_below_hz > 0) chips.push(`${t('master.auto.monobass')} ${corrections.mono_below_hz}Hz`);
+  if (Math.abs(corrections.width_factor - 1) > 0.02) {
+    chips.push(`${t('master.auto.width')} ×${corrections.width_factor.toFixed(2)}`);
+  }
+  if (Math.abs(corrections.section_amount) > 0.02) {
+    const lbl = corrections.section_amount > 0 ? t('master.dyn.punch') : t('master.dyn.balance');
+    chips.push(`${lbl} ${fmtDb(corrections.section_amount * 100, 0)}%`);
+  }
+  return (
+    <div className="al-master__autobar">
+      <span className="al-master__autohead"><Wand2 size={13} /> {t('master.auto.title')}</span>
+      {chips.length ? (
+        <div className="al-master__autochips">
+          {chips.map((c, i) => <span key={i} className="al-master__autochip">{c}</span>)}
+        </div>
+      ) : (
+        <span className="al-master__autoclean">{t('master.auto.clean')}</span>
+      )}
     </div>
   );
 }

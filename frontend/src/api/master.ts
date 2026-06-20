@@ -16,11 +16,104 @@ import { apiUrl, ApiError, API_BASE } from './client';
 export type MasterLoudness = 'streaming' | 'balanced' | 'social';
 export type MasterJobStatusValue = 'queued' | 'running' | 'done' | 'error';
 
+// ── Intelligent analysis types (smart auto-mastering) ──────────────────────
+export type Severity = 'high' | 'medium' | 'low';
+
+export interface AnalysisBand {
+  name: string;
+  lo: number;
+  hi: number;
+  measured_db: number;
+  target_db: number;
+  deviation_db: number;
+  eq_gain_db: number;
+}
+
+export interface AnalysisProblem {
+  id: string;
+  severity: Severity;
+  area: string;
+  message: string;     // zh
+  messageEn: string;
+  action: string;      // zh
+  actionEn: string;
+  metrics: Record<string, number | null>;
+}
+
+export interface AnalysisSection {
+  start_s: number;
+  end_s: number;
+  type: 'verse' | 'chorus';
+}
+
+export interface MasterCorrections {
+  eq_band_gains_db: Record<string, number>;
+  low_cut_hz: number;
+  mono_below_hz: number;
+  comp_amount: number;
+  width_factor: number;
+  loudness: string;
+  tp_ceiling_dbtp: number;
+  section_amount: number;
+  trust: number;
+}
+
+/** Full intelligent analysis of a mix (from /api/master/analyze or master meta). */
+export interface MasterAnalysis {
+  sr: number;
+  duration_s: number;
+  genre: string;
+  spectrum: {
+    freqs: number[];
+    before_db: number[];
+    after_db: number[];
+    target_db: number[];
+  };
+  bands: AnalysisBand[];
+  sections: {
+    times_s: number[];
+    energy_db: number[];
+    segments: AnalysisSection[];
+    gain_curve_db: number[];
+    amount: number;
+  };
+  loudness: {
+    integrated_lufs: number;
+    short_term_max_lufs: number;
+    momentary_max_lufs: number;
+    lra_lu: number;
+    true_peak_dbtp: number;
+    sample_peak_dbfs: number;
+  };
+  dynamics: {
+    crest_factor_db: number;
+    plr: number;
+    psr: number;
+    dr_est: number | null;
+    rms_db: number;
+  };
+  spectral: {
+    centroid_hz: number;
+    tilt_db_oct: number;
+  };
+  stereo: {
+    correlation: number;
+    width_index: number;
+    ms_balance_db: number;
+    low_mono_corr: number;
+    mono_compatible: boolean;
+  };
+  problems: AnalysisProblem[];
+  corrections: MasterCorrections;
+  overall_score: number;
+}
+
 /** Mastering measurement/summary returned in the job meta. */
 export interface MasterMeta {
   sampleRate: number;
   genre: string;
   loudness: string;
+  auto?: boolean;
   referenceUsed: boolean;
   width: number;
   inputLufs: number;
@@ -29,6 +122,9 @@ export interface MasterMeta {
   inputPeakDb: number;
   outputPeakDb: number;
   ceilingDb: number;
+  /** Before/after intelligent analysis for the A/B visualization (auto mode). */
+  before?: MasterAnalysis | null;
+  after?: MasterAnalysis | null;
 }
 
 export interface MasterJobStatus {
@@ -58,6 +154,10 @@ export interface MasterAdvanced {
   compScale?: number;
   /** True-peak ceiling override dBTP (−6..0). */
   ceiling?: number;
+  /** Intelligent mode: analyze the song and apply data-driven corrections as the base. */
+  auto?: boolean;
+  /** Auto-correction strength 0.2 (natural) .. 1.0 (strong). Default 0.7. */
+  autoStrength?: number;
 }
 
 /** POST /api/master — spawn the background mastering job. */
@@ -87,6 +187,8 @@ export async function createMasterJob(
     add('eqAir', a.eqAir);
     add('compScale', a.compScale);
     add('ceiling', a.ceiling);
+    add('autoStrength', a.autoStrength);
+    if (a.auto) form.append('auto', 'true');
   }
 
   let res: Response;
@@ -127,4 +229,35 @@ export async function getMasterJob(jobId: string, signal?: AbortSignal): Promise
 /** Absolute URL for the finished mastered wav. */
 export function masterResultUrl(jobId: string): string {
   return apiUrl(`/api/master/jobs/${encodeURIComponent(jobId)}/result`);
+}
+
+/** POST /api/master/analyze — intelligent diagnosis of a mix (no rendering). */
+export async function analyzeMaster(
+  audio: File,
+  genre: string,
+  strength?: number,
+  signal?: AbortSignal,
+): Promise<MasterAnalysis> {
+  const form = new FormData();
+  form.append('audio', audio, audio.name);
+  form.append('genre', genre);
+  if (strength !== undefined && Number.isFinite(strength)) form.append('strength', String(strength));
+  let res: Response;
+  try {
+    res = await fetch(apiUrl('/api/master/analyze'), { method: 'POST', body: form, signal });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'network error';
+    throw new ApiError(`Cannot reach local backend at ${API_BASE} (${message})`, 0, true);
+  }
+  if (!res.ok) {
+    let detail = res.statusText;
+    try {
+      const data = (await res.json()) as { detail?: string; message?: string };
+      detail = data.detail ?? data.message ?? detail;
+    } catch {
+      /* keep statusText */
+    }
+    throw new ApiError(detail || `Analyze failed (${res.status})`, res.status);
+  }
+  return (await res.json()) as MasterAnalysis;
 }
