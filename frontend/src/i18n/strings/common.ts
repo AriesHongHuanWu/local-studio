@@ -27,6 +27,11 @@ export const common: Record<string, Entry> = {
   'common.mode.song': { zh: '歌曲歌詞', en: 'Lyrics' },
   'common.mode.video': { zh: '影片字幕', en: 'Subtitles' },
   'common.mode.clean': { zh: '文字移除', en: 'Clean Text' },
+  'common.cat.pinned': { zh: '釘選', en: 'Pinned' },
+  'common.cat.audio': { zh: '音訊製作', en: 'Audio' },
+  'common.cat.video': { zh: '影片製作', en: 'Video' },
+  'common.pin.add': { zh: '釘選到最上面', en: 'Pin to top' },
+  'common.pin.remove': { zh: '取消釘選', en: 'Unpin' },
   'common.mode.songTitle': {
     zh: '歌曲歌詞 — 分離人聲、辨識、對齊出逐字卡拉 OK',
     en: 'Song lyrics — separate vocals, transcribe, align word-level karaoke',

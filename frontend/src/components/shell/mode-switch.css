@@ -52,9 +52,56 @@
 }
 
 .al-modesw__label {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Category grouping */
+.al-modesw__group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.al-modesw__group + .al-modesw__group {
+  margin-top: var(--al-space-2);
+}
+.al-modesw__cat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px 2px;
+  font-family: var(--al-font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: var(--al-tracking-caps);
+  color: var(--al-ink-faint);
+}
+
+/* Pin-to-top toggle on each tool (appears on hover/focus, stays when pinned) */
+.al-modesw__pin {
+  display: inline-flex;
+  flex-shrink: 0;
+  padding: 2px;
+  border-radius: var(--al-radius-chip);
+  color: var(--al-ink-faint);
+  opacity: 0;
+  transition: opacity var(--al-dur-focus) var(--al-ease-ink), color var(--al-dur-focus) var(--al-ease-ink);
+  cursor: pointer;
+}
+.al-modesw__seg:hover .al-modesw__pin,
+.al-modesw__seg:focus-visible .al-modesw__pin {
+  opacity: 0.7;
+}
+.al-modesw__pin:hover {
+  opacity: 1;
+  color: var(--al-gold);
+}
+.al-modesw__pin--on {
+  opacity: 1;
+  color: var(--al-gold);
 }
 
 .al-modesw__seg:hover:not(.al-modesw__seg--active) {

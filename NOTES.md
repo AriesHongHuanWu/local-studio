@@ -1,20 +1,17 @@
-# Local Studio v0.1.32
+# Local Studio v0.1.33
 
-💻 **Better on small laptops** — a performance mode that lightens the mastering work for weaker, GPU-less machines, on automatically where it's needed.
+🗂️ **A studio you can organise** — the tool sidebar is now grouped into categories with pin-to-top favourites, and Local Studio is repositioned for who it's really for: **artists and content creators**.
 
-### New — performance mode
-A new **Performance mode (small laptops)** option (Pro → Advanced) makes mastering lighter:
-- Skips the heaviest measurement work (the sliding loudness history and 4× true-peak oversampling) and runs the harmonic saturation without oversampling.
-- The master still lands on the same target loudness, stays peak-safe, and applies the same corrective EQ — the quality difference is negligible; it just does less number-crunching.
-- **On by default when your machine has no GPU** (a strong "low-power laptop" signal), so small laptops get the lighter path automatically. You can toggle it any time.
+### New — categorized, pinnable sidebar
+- Tools are now grouped under **Audio** (Lyrics · Mastering) and **Video** (Subtitles · Text Removal), so the product has room to grow.
+- **Pin your favourites to the top** — click the pin on any tool and it rises into a **Pinned** section; its category shows the rest (no duplicates). Your pins are remembered between sessions.
+- Keyboard-accessible as before; collapses to icons on narrow windows.
 
-This keeps Local Studio responsive on modest hardware, where the full analysis on every master would otherwise be slow.
+### New — clearer positioning
+Local Studio is now framed as **the complete local studio for artists & content creators** — one free, private, offline app for the work that ships your music and videos: pro mastering, word-level lyrics, video subtitles, and on-screen text removal. The README and landing page lead with that.
 
 ### Unchanged
-- All mastering features (AI stem mastering, genre detection, auto-EQ curve, automation lanes, manual multiband, adaptive EQ, Pro parametric EQ) and the lyrics/subtitles/text-removal modes work as before.
-
-### Coming next
-A categorized + pinnable tool sidebar, and clearer positioning for artists and content creators.
+- Every tool (AI stem mastering, genre detection, auto-EQ curve, automation lanes, manual multiband, adaptive EQ, performance mode, lyrics, subtitles, text removal) works as before.
 
 Support: ☕ [Ko-fi](https://ko-fi.com/arieswu) · [PayPal](https://paypal.me/Arieshonghuan) · [GitHub Sponsors](https://github.com/sponsors/AriesHongHuanWu).
 

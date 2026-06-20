@@ -1,11 +1,11 @@
 <div align="center">
 
-# ◆ Ai Caption
+# ◆ Local Studio
 
-**Local-first AI captioning — video → subtitles, and song → word-level lyrics**
-**本地端 AI 字幕引擎 —— 影片轉字幕，歌曲轉逐字歌詞**
+**The complete local studio for artists & content creators**
+**給藝人與自媒體製作人的完整本地工作室**
 
-Turn any **video or audio** into clean **subtitles** (SRT / WebVTT), or turn any **song** into **word-level timed lyrics** (LRC / SRT / ASS-karaoke / JSON) — 100% on your own machine. No upload. No account. No tracking. **Runs on any laptop — no discrete GPU required.**
+One free, private, offline app for the work that ships your music and videos: **pro mastering** (AI + manual, rivaling LANDR / iZotope Ozone), **word-level lyrics** (LRC / ASS-karaoke), **video subtitles** (SRT / WebVTT), and **on-screen text removal**. Your audio, video and text **never leave your machine** — no upload, no account, no tracking, no minute caps. **Runs on any laptop — no discrete GPU required.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-E8C36B.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-Windows%20(binary)%20·%20macOS%2FLinux%20(source)-121013)
@@ -28,12 +28,14 @@ Turn any **video or audio** into clean **subtitles** (SRT / WebVTT), or turn any
 
 ---
 
-## 🇬🇧 What is Ai Caption?
+## 🇬🇧 What is Local Studio?
 
-Ai Caption ([repo: **local-studio**](https://github.com/AriesHongHuanWu/local-studio)) is a free, open-source (MIT) **local-first desktop app** for AI captioning — it does **two** jobs:
+Local Studio ([repo: **local-studio**](https://github.com/AriesHongHuanWu/local-studio)) is a free, open-source (MIT) **local-first desktop studio** for musicians, singers, and video / podcast / self-media creators. Four tools, one app, organised into categories you can pin and grow:
 
-- 🎬 **Video → Subtitles** — transcribe any video or audio file into clean, ready-to-use **subtitles** (SRT / WebVTT) in the original language. No vocal separation, no reference text — just drop a file and get captions.
-- 🎵 **Song → Lyrics** — turn a song into **word-level timed lyrics** — LRC (line/word), SRT, **ASS karaoke** (`\k` sweep), or JSON — using a music-tuned pipeline (vocal separation + forced alignment).
+- 🎚️ **Mastering** — make a mix release-ready. Intelligent auto-mastering that *listens* to the song and draws its own corrective EQ, plus a deep Pro chain: parametric EQ (per-band phase + Mid/Side), manual multiband, dynamic EQ, adaptive EQ, **draw-it-yourself EQ automation**, **AI stem rebalance** (Demucs separates drums/bass/vocals/other so you can fix a buried vocal — like Ozone's Master Rebalance), loudness-matched A/B and a three-way comparison. Aiming to **surpass LANDR and iZotope Ozone** — fully local and free.
+- 🎵 **Song → Lyrics** — turn a song into **word-level timed lyrics** — LRC (line/word), SRT, **ASS karaoke** (`\k` sweep), or JSON — with a music-tuned pipeline (vocal separation + forced alignment), and burn animated captions into a video.
+- 🎬 **Video → Subtitles** — transcribe any video or audio into clean, ready-to-use **subtitles** (SRT / WebVTT) in the original language. Just drop a file.
+- 🧹 **Text Removal** — box a burned-in caption / watermark-style text region and AI-inpaint it out of every frame, re-encoding with the original audio.
 
 Everything runs **on your own machine**: your audio, video and text never leave the device, there's no cloud upload, no account, and no minute caps.
 
