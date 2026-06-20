@@ -106,6 +106,13 @@ export interface MasterAnalysis {
   problems: AnalysisProblem[];
   corrections: MasterCorrections;
   overall_score: number;
+  /** AI genre detection (suggestion; user can accept/override). */
+  detectedGenre?: {
+    genre: string;
+    confidence: number;
+    ranking: { genre: string; prob: number }[];
+    features: { crest_db: number; width: number; tilt_db_oct: number };
+  };
 }
 
 // ── Pro chain meters + stereo imager (v0.1.17) ─────────────────────────────

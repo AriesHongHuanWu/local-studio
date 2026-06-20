@@ -930,6 +930,66 @@ def _auto_corrections(band_dev: dict[str, float], dyn: dict[str, float],
     }
 
 
+# =========================================================================== #
+# AI 曲風辨識(feature-based classifier,license-clean numpy/scipy)—— 用頻段形狀 +
+# 動態(crest)+ 立體聲寬度 + 頻譜傾斜,對每個曲風的「典型特徵輪廓」算距離 → 機率。
+# 自動挑起始預設(使用者可改);誠實附信心值 + 前 3 名。
+# =========================================================================== #
+# 每個曲風的典型「去均值頻段強調(dB)」+ 典型 crest(dB)+ 典型側/中寬度。
+_GENRE_PROFILES: dict[str, dict] = {
+    "edm":      {"bands": {"sub": 3.5, "bass": 2.5, "low_mid": -1.0, "mid": -2.0, "high_mid": -1.0, "presence": 1.5, "air": 2.5}, "crest": 6.5, "width": 0.55, "tilt": -3.0},
+    "hiphop":   {"bands": {"sub": 4.5, "bass": 2.5, "low_mid": 0.0, "mid": -1.0, "high_mid": -1.5, "presence": -1.0, "air": -2.0}, "crest": 7.5, "width": 0.38, "tilt": -3.6},
+    "pop":      {"bands": {"sub": 0.0, "bass": 1.0, "low_mid": -1.5, "mid": 0.0, "high_mid": 1.0, "presence": 1.5, "air": 1.5}, "crest": 8.5, "width": 0.5, "tilt": -3.2},
+    "rock":     {"bands": {"sub": -2.5, "bass": 0.0, "low_mid": 2.0, "mid": 2.5, "high_mid": 1.0, "presence": 0.0, "air": -1.5}, "crest": 11.5, "width": 0.34, "tilt": -2.8},
+    "rnb":      {"bands": {"sub": 2.5, "bass": 2.5, "low_mid": 1.0, "mid": 0.0, "high_mid": -1.0, "presence": -1.0, "air": 0.0}, "crest": 9.0, "width": 0.42, "tilt": -3.8},
+    "acoustic": {"bands": {"sub": -3.5, "bass": -1.0, "low_mid": 1.0, "mid": 2.5, "high_mid": 1.5, "presence": 1.0, "air": 0.0}, "crest": 13.5, "width": 0.34, "tilt": -3.0},
+    "ballad":   {"bands": {"sub": -1.5, "bass": 0.0, "low_mid": 1.0, "mid": 1.5, "high_mid": 1.0, "presence": 0.0, "air": 0.0}, "crest": 12.0, "width": 0.4, "tilt": -3.2},
+    "lofi":     {"bands": {"sub": 1.0, "bass": 1.5, "low_mid": 2.5, "mid": 0.0, "high_mid": -2.0, "presence": -3.5, "air": -4.5}, "crest": 8.5, "width": 0.28, "tilt": -4.6},
+}
+
+
+def detect_genre(data: "np.ndarray", sr: int) -> dict:
+    """從音訊特徵推測曲風。回 {genre, confidence 0..1, ranking:[{genre,prob}], features}。"""
+    names = [b for b, _, _ in _BANDS]
+    mono = np.mean(data, axis=1)
+    f, pxx = _welch_psd(mono, sr)
+    band_db = _band_levels_db(f, pxx)
+    bm = float(np.mean(list(band_db.values())))
+    emph = {b: band_db[b] - bm for b in names}                # 去均值頻段強調
+    peak = float(np.max(np.abs(data))) + 1e-9
+    rms = float(np.sqrt(np.mean(data ** 2)) + 1e-12)
+    crest = 20.0 * np.log10(peak / rms)
+    tilt = _spectral_tilt(f, pxx)
+    if data.shape[1] >= 2:
+        L, R = data[:, 0], data[:, 1]
+        rms_mid = float(np.sqrt(np.mean((0.5 * (L + R)) ** 2) + 1e-12))
+        rms_side = float(np.sqrt(np.mean((0.5 * (L - R)) ** 2) + 1e-12))
+        width = rms_side / (rms_mid + 1e-12)
+    else:
+        width = 0.0
+    # 距離 → 機率(權重:頻段形狀為主,動態/寬度/傾斜為輔)
+    dists: dict[str, float] = {}
+    for g, prof in _GENRE_PROFILES.items():
+        d = sum((emph[b] - prof["bands"][b]) ** 2 for b in names)   # dB^2
+        d += 0.5 * (crest - prof["crest"]) ** 2
+        d += 30.0 * (width - prof["width"]) ** 2                     # 寬度 0..1 → 放大
+        d += 1.5 * (tilt - prof["tilt"]) ** 2
+        dists[g] = float(d)
+    ds = np.array([dists[g] for g in _GENRE_PROFILES])
+    # softmax over -distance;scale 取距離分佈的離散度,讓最佳曲風脫穎而出(但相似曲風仍分票)
+    scale = max(10.0, 0.45 * float(np.median(ds)))
+    probs = np.exp(-(ds - ds.min()) / scale)
+    probs = probs / float(np.sum(probs))
+    order = sorted(zip(_GENRE_PROFILES.keys(), probs), key=lambda kv: -kv[1])
+    return {
+        "genre": order[0][0],
+        "confidence": round(float(order[0][1]), 2),
+        "ranking": [{"genre": g, "prob": round(float(p), 2)} for g, p in order[:3]],
+        "features": {"crest_db": round(crest, 1), "width": round(float(width), 2),
+                     "tilt_db_oct": round(float(tilt), 2)},
+    }
+
+
 def analyze(data: "np.ndarray", sr: int, *, genre: str = "auto",
             section_amount: Optional[float] = None, strength: float = 0.7) -> dict:
     """整首歌的智慧分析:響度/動態/頻譜/立體聲 + 問題清單 + 自動修正 + 視覺化資料。
@@ -1147,7 +1207,12 @@ def analyze_file(path: str, *, genre: str = "auto", strength: float = 0.7) -> di
     if not _HAS_DSP:
         raise RuntimeError("母帶 DSP 相依不可用(需 scipy + pyloudnorm)")
     data, sr = _load_audio(path)
-    return analyze(data, sr, genre=genre, strength=strength)
+    result = analyze(data, sr, genre=genre, strength=strength)
+    try:
+        result["detectedGenre"] = detect_genre(data, sr)  # AI 曲風辨識(建議起始預設)
+    except Exception:
+        logger.warning("曲風辨識失敗(略過)", exc_info=True)
+    return result
 
 
 def match_loudness(input_path: str, output_path: str, target_lufs: float) -> dict:

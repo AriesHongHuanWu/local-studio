@@ -156,6 +156,8 @@ export const common: Record<string, Entry> = {
     zh: '把歌切成時間窗,讓校正曲線「隨段落自動改變」——主歌糊就修主歌、副歌刺就修副歌,過了就放開。等於工程師全程自動 ride EQ,整首歌都好聽。',
     en: 'Slices the song into windows so the corrective EQ rides the music section by section — tame a dull verse, soften a harsh chorus, then let go. Like an engineer automating the EQ across the whole song.',
   },
+  'master.ai.detected': { zh: '🤖 AI 偵測曲風:', en: '🤖 AI detected genre:' },
+  'master.ai.apply': { zh: '套用', en: 'Apply' },
   'master.auto.toggle': { zh: 'EQ 自動化曲線(手動畫)', en: 'EQ automation (draw curves)' },
   'master.auto.hint': {
     zh: '像 DAW:自己畫「某頻段的增益隨時間變化」。例:副歌時把高頻拉亮、橋段把低頻收一點。拖點移動、點空白處新增、雙擊刪除。',

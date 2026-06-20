@@ -52,6 +52,7 @@ export function MasteringFlow() {
   const genres = meta.masterGenres && meta.masterGenres.length
     ? meta.masterGenres
     : [{ key: 'auto', label: 'Auto' }];
+  const genreLabel = (k: string) => genres.find((g) => g.key === k)?.label ?? k;
 
   const [file, setFile] = useState<File | null>(null);
   const [srcUrl, setSrcUrl] = useState<string | null>(null);
@@ -388,6 +389,27 @@ export function MasteringFlow() {
       <section className="al-section">
         <Eyebrow num={3}>{t('master.section.style')}</Eyebrow>
         <p className="al-master__sub">{t('master.genreLabel')}</p>
+        {analysis?.detectedGenre && (
+          <div className="al-master__aigenre">
+            <Wand2 size={14} />
+            <span className="al-master__aigenre-text">
+              {t('master.ai.detected')} <strong>{genreLabel(analysis.detectedGenre.genre)}</strong>
+              <span className="al-master__aigenre-conf">
+                {Math.round(analysis.detectedGenre.confidence * 100)}%
+              </span>
+            </span>
+            {genre !== analysis.detectedGenre.genre && (
+              <button
+                type="button"
+                className="al-master__aigenre-apply"
+                onClick={() => pickGenre(analysis.detectedGenre!.genre)}
+                disabled={running}
+              >
+                {t('master.ai.apply')}
+              </button>
+            )}
+          </div>
+        )}
         <div className="al-master__genres">
           {genres.map((g) => (
             <button
