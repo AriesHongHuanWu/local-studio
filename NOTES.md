@@ -1,18 +1,16 @@
-# Local Studio v0.1.18
+# Local Studio v0.1.19
 
-Smoother startup and a calmer, friendlier interface — fewer scary messages, better recovery.
+🔊 **Fix: no sound after mastering.** Mastered (and original) playback is audible again.
 
-### Fixed — startup & connection
-- **No more "OFFLINE / Cannot reach backend" on launch.** The local engine needs ~20–30s to start (it loads the AI runtime), and the app used to flash a red **OFFLINE** badge — and, worse, could stay stuck offline even after the engine came up. Now it shows a calm **"啟動引擎中… / Starting engine…"** and **auto-reconnects** the moment the engine is ready.
-- **Stuck-offline bug fixed** — the app now keeps retrying the connection on a normal launch (previously it only retried right after first-run setup), so it reliably comes online on its own.
-- **Engine recovery** — if the engine genuinely fails to start (e.g. a half-finished install), you now get a friendly banner with **Retry** and **Reinstall engine** instead of a silent dead state.
+### Fixed
+- **Sound is back.** In v0.1.17–v0.1.18 the live "spectrum while playing" feature tapped the audio player through the Web Audio API, which **rerouted the player's output** into an audio graph that the browser leaves suspended until a real click — so auto-played audio came out **silent**. The live tap has been removed, so the players are plain, native audio again and **always produce sound**.
+- The stereo imager (goniometer) now draws from the master's analysis data instead of tapping playback — same picture, no risk to audio.
 
-### Fixed — fewer false alarms
-- **No update-check pop-ups** — the "check for updates" failure modal no longer appears on launch when you're offline. Update errors now only show if *you* press "Check for updates."
-- **No health warnings during boot** — the components/health banner no longer flashes while the engine is still starting; it only appears for a genuine, actionable issue once everything is up.
+### Coming back, safely
+- The live "watch the spectrum move while it plays" view will return in a later update using a method that **never touches playback** (a spectrogram synced to the play position), so it can't silence audio again. The full analysis — spectrum, band balance, gain-reduction meters, stereo field, signal chain, before→after — is all still here.
 
 ### Unchanged
-- All v0.1.15–v0.1.17 features (device-aware setup, intelligent auto-mastering, the pro chain + live visualizations) work exactly as before.
+- All v0.1.17 mastering (multiband, de-esser, saturation, 2nd-pass EQ, scoring) and the v0.1.18 calm-startup improvements work as before.
 
 Support: ☕ [Ko-fi](https://ko-fi.com/arieswu) · [PayPal](https://paypal.me/Arieshonghuan) · [GitHub Sponsors](https://github.com/sponsors/AriesHongHuanWu).
 

@@ -22,7 +22,6 @@ import { useMeta } from '../../state/useMeta';
 import { useT } from '../../i18n';
 import type { TFn } from '../../i18n';
 import { AnalysisPanel, ResultCompare } from './mastering/AnalysisPanel';
-import { LiveSpectrum } from './mastering/LiveSpectrum';
 import { Goniometer } from './mastering/Goniometer';
 import { GainReduction } from './mastering/GainReduction';
 import { SignalChain } from './mastering/SignalChain';
@@ -83,9 +82,6 @@ export function MasteringFlow() {
   const [analyzing, setAnalyzing] = useState(false);
   const analyzeAbort = useRef<AbortController | null>(null);
 
-  // Captured <audio> DOM nodes for the live WebAudio visualizations.
-  const [srcAudioEl, setSrcAudioEl] = useState<HTMLAudioElement | null>(null);
-  const [resultAudioEl, setResultAudioEl] = useState<HTMLAudioElement | null>(null);
 
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stoppedRef = useRef(false);
@@ -259,8 +255,7 @@ export function MasteringFlow() {
           <div className="al-master__player">
             <span className="al-master__playerlabel">{t('master.original')}</span>
             {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-            <audio ref={setSrcAudioEl} src={srcUrl} controls className="al-master__audio" />
-            <LiveSpectrum audioEl={srcAudioEl} tone="gold" label={t('master.live.original')} />
+            <audio src={srcUrl} controls className="al-master__audio" />
           </div>
         )}
       </section>
@@ -475,8 +470,7 @@ export function MasteringFlow() {
                 <Disc3 size={13} /> {t('master.mastered')}
               </span>
               {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-              <audio ref={setResultAudioEl} src={resultUrl} controls autoPlay className="al-master__audio" />
-              <LiveSpectrum audioEl={resultAudioEl} tone="green" label={t('master.live.mastered')} />
+              <audio src={resultUrl} controls autoPlay className="al-master__audio" />
             </div>
 
             {resultMeta?.chain && (
@@ -496,7 +490,7 @@ export function MasteringFlow() {
             {resultMeta?.goniometer && (
               <div className="al-an__block">
                 <span className="al-an__blocktitle">{t('master.an.imager')}</span>
-                <Goniometer audioEl={resultAudioEl} data={resultMeta.goniometer} />
+                <Goniometer data={resultMeta.goniometer} />
               </div>
             )}
 
