@@ -1848,6 +1848,11 @@ def _run_master_job(
             ceiling_db=opts.get("ceiling_db"),
             auto=opts.get("auto", False),
             auto_strength=opts.get("auto_strength", 0.7),
+            de_ess=opts.get("de_ess"),
+            de_ess_amount=opts.get("de_ess_amount"),
+            multiband=opts.get("multiband"),
+            saturation=opts.get("saturation", 0.0),
+            residual_eq=opts.get("residual_eq"),
             progress=progress,
         )
         with _MASTER_JOBS_LOCK:
@@ -1894,6 +1899,11 @@ async def api_master(
     ceiling: Optional[float] = Form(None),
     auto: Optional[bool] = Form(None),
     autoStrength: Optional[float] = Form(None),
+    deEss: Optional[bool] = Form(None),
+    deEssAmount: Optional[float] = Form(None),
+    multiband: Optional[bool] = Form(None),
+    saturation: Optional[float] = Form(None),
+    residualEq: Optional[bool] = Form(None),
 ) -> JSONResponse:
     """建立母帶工作。multipart:audio=混音檔,genre,loudness,選用 reference=參考曲,
     以及選用的進階參數(width/dynamics/eq*/compScale/ceiling)。
@@ -1922,6 +1932,11 @@ async def api_master(
         "ceiling_db": _f(ceiling, -6.0, 0.0),
         "auto": bool(auto) if auto is not None else False,
         "auto_strength": _f(autoStrength, 0.2, 1.0) if autoStrength is not None else 0.7,
+        "de_ess": bool(deEss) if deEss is not None else None,
+        "de_ess_amount": _f(deEssAmount, 0.0, 1.0) if deEssAmount is not None else None,
+        "multiband": bool(multiband) if multiband is not None else None,
+        "saturation": _f(saturation, 0.0, 1.0) if saturation is not None else 0.0,
+        "residual_eq": bool(residualEq) if residualEq is not None else None,
     }
 
     valid_genres = [g["key"] for g in mastering.genres()] if mastering is not None else ["auto"]  # type: ignore[union-attr]

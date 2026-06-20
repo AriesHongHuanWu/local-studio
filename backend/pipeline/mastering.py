@@ -1019,8 +1019,34 @@ def analyze(data: "np.ndarray", sr: int, *, genre: str = "auto",
         "amount": round(float(sec_amt), 3),
     }
 
-    score = 100 - sum({"high": 15, "medium": 7, "low": 3}.get(p["severity"], 0) for p in problems)
-    score = int(max(0, min(100, score)))
+    # 分數 = 100 − 問題罰分 + 「達標獎勵」。關鍵不變式:只有真正做好的母帶才拿得到獎勵與綠燈
+    # —— 過壓/相位差的爛母帶即使限幅器把真峰/斜率做漂亮,也**不准**靠音色獎勵爬進綠帶。
+    penalties = sum({"high": 15, "medium": 7, "low": 3}.get(p["severity"], 0) for p in problems)
+    pids = {p["id"] for p in problems}
+    has_dyn_fault = ("over_compressed" in pids) or any(p["area"] == "dynamics" for p in problems)
+    has_stereo_fault = bool(pids & {"too_narrow", "too_wide_phase", "low_end_not_mono"})
+    bonus = 0.0
+    # 音色/響度獎勵:只有在「動態沒問題」時才給(否則限幅器產物會輕鬆刷滿)
+    if not has_dyn_fault:
+        if true_peak <= -1.0:
+            bonus += 3.0
+        elif true_peak <= 0.0:
+            bonus += 1.0
+        if -4.6 <= tilt <= -2.4:
+            bonus += 2.0
+        if dr_est is not None and dr_est >= 8:
+            bonus += 2.0
+        if crest >= 8.0:
+            bonus += 2.0
+    # 立體聲獎勵:只有在沒有立體聲問題時才給
+    if not has_stereo_fault and 0.15 <= width_index <= 0.9 and correlation > 0.2:
+        bonus += 2.0
+    bonus = min(bonus, 12.0)
+    score = 100 - penalties + bonus
+    # 硬上限:被判定過度壓縮的母帶,不論音色多漂亮都不得進入「綠燈(>=80)」。
+    if has_dyn_fault:
+        score = min(score, 72)
+    score = int(max(0, min(100, round(score))))
 
     _out = {
         "sr": asr,
@@ -1090,6 +1116,217 @@ def analyze_file(path: str, *, genre: str = "auto", strength: float = 0.7) -> di
     return analyze(data, sr, genre=genre, strength=strength)
 
 
+# =========================================================================== #
+# 專業處理鏈(Pro chain)—— 多頻段壓縮、齒音消除、諧波飽和、二次修正 EQ、
+# 立體聲示波器資料。全 numpy/scipy,授權乾淨。
+# =========================================================================== #
+
+_METER_HZ = 16.0  # GR / de-ess 計量送往 UI 的解析度(~16 fps)
+_GONIO_POINTS = 1400  # 示波器散點數
+_GR_MAX_POINTS = 1800  # GR 包絡上限點數(避免長檔 JSON 無上限膨脹)
+
+# 多頻段壓縮每段預設 (thresh_db, ratio, attack_ms, release_ms, makeup_db)
+_MB_BANDS_DEFAULT: dict[str, dict[str, float]] = {
+    "low": {"thresh_db": -22.0, "ratio": 2.5, "attack_ms": 30.0, "release_ms": 180.0, "makeup_db": 0.0},
+    "mid": {"thresh_db": -20.0, "ratio": 2.0, "attack_ms": 15.0, "release_ms": 120.0, "makeup_db": 0.0},
+    "high": {"thresh_db": -24.0, "ratio": 2.2, "attack_ms": 5.0, "release_ms": 80.0, "makeup_db": 0.0},
+}
+
+
+def _downsample_env_db(gain_lin: "np.ndarray", sr: int, meter_hz: float = _METER_HZ) -> list:
+    """逐樣本線性增益(<=1)→ dB 包絡,降到 ~meter_hz。每塊取最小(最壞 GR)讓暫態看得見。"""
+    if gain_lin.size == 0:
+        return []
+    blk = max(1, int(sr / max(meter_hz, 1.0)))
+    n = gain_lin.shape[0]
+    pad = (-n) % blk
+    g = np.concatenate([gain_lin, np.ones(pad)]) if pad else gain_lin
+    g = g.reshape(-1, blk).min(axis=1)
+    gr_db = 20.0 * np.log10(np.clip(g, 1e-4, 1.0))
+    # 上限化:長檔(DJ set/podcast)不讓點數無上限成長 → 固定上限,UI 畫線足夠
+    if gr_db.shape[0] > _GR_MAX_POINTS:
+        stride = int(np.ceil(gr_db.shape[0] / _GR_MAX_POINTS))
+        gr_db = gr_db[::stride]
+    return [round(float(v), 2) for v in gr_db]
+
+
+def _lr4_sos(sr: int, fc: float, btype: str) -> "np.ndarray":
+    """Linkwitz-Riley 4 階 = 兩級串接的 2 階 Butterworth(相位一致、合成平坦)。"""
+    wn = min(max(fc / (sr / 2.0), 1e-4), 0.999)
+    sos2 = sps.butter(2, wn, btype=btype, output="sos")
+    return np.vstack([sos2, sos2])
+
+
+def _lr4_split3(data: "np.ndarray", sr: int, f_lo: float = 200.0,
+                f_hi: float = 4000.0) -> tuple["np.ndarray", "np.ndarray", "np.ndarray"]:
+    """相位一致 3 頻段 LR4 分頻:low + mid + high ≈ input(量值平坦)。"""
+    lp_lo = _lr4_sos(sr, f_lo, "low")
+    hp_lo = _lr4_sos(sr, f_lo, "high")
+    lp_hi = _lr4_sos(sr, f_hi, "low")
+    hp_hi = _lr4_sos(sr, f_hi, "high")
+    low = np.empty_like(data)
+    mid = np.empty_like(data)
+    high = np.empty_like(data)
+    for ch in range(data.shape[1]):
+        x = data[:, ch]
+        lo_full = sps.sosfilt(lp_lo, x)
+        hi_full = sps.sosfilt(hp_lo, x)
+        low[:, ch] = lo_full
+        mid[:, ch] = sps.sosfilt(lp_hi, hi_full)
+        high[:, ch] = sps.sosfilt(hp_hi, hi_full)
+    return low, mid, high
+
+
+def _comp_band(band: "np.ndarray", sr: int, *, thresh_db: float, ratio: float,
+               attack_ms: float, release_ms: float, makeup_db: float) -> tuple["np.ndarray", "np.ndarray"]:
+    """壓一個頻段。回 (壓縮後音訊, 逐樣本線性增益<=1 不含 makeup,供 GR 計量)。向量化平滑。"""
+    detect = np.sqrt(np.mean(band ** 2, axis=1) + 1e-12)
+    level_db = 20.0 * np.log10(detect + 1e-9)
+    over = np.maximum(0.0, level_db - thresh_db)
+    gr_db = -over * (1.0 - 1.0 / max(ratio, 1.0))
+    tau = max(1.0, (attack_ms + release_ms) / 2.0)
+    a = float(np.exp(-1.0 / (sr * tau / 1000.0)))
+    gr_sm = sps.lfilter([1 - a], [1, -a], gr_db)
+    comp_gain = 10 ** (gr_sm / 20.0)
+    out_gain = 10 ** ((gr_sm + makeup_db) / 20.0)
+    return band * out_gain[:, None], comp_gain
+
+
+def _multiband_compress(data: "np.ndarray", sr: int, *, amount: float = 1.0,
+                        f_lo: float = 200.0, f_hi: float = 4000.0) -> tuple["np.ndarray", dict]:
+    """3 頻段 LR4 多頻段壓縮(專業母帶核心)。amount 縮放各段 ratio 超出量與 makeup。
+    回 (音訊, meter:各段 GR 包絡 dB@~16Hz + 摘要)。"""
+    amount = float(max(0.0, amount))
+    if amount < 1e-3:
+        return data, {"active": False, "f_lo": f_lo, "f_hi": f_hi, "meter_hz": _METER_HZ, "bands": {}}
+    low, mid, high = _lr4_split3(data, sr, f_lo, f_hi)
+    out = np.zeros_like(data)
+    bands_meter: dict[str, dict] = {}
+    for name, band in (("low", low), ("mid", mid), ("high", high)):
+        p = dict(_MB_BANDS_DEFAULT[name])
+        p["ratio"] = 1.0 + (p["ratio"] - 1.0) * amount
+        p["makeup_db"] = p["makeup_db"] * amount
+        comp, gain_lin = _comp_band(band, sr, **p)
+        out += comp
+        env = _downsample_env_db(gain_lin, sr)
+        bands_meter[name] = {"gr_db": env, "max_gr_db": round(float(min(env)) if env else 0.0, 2)}
+    return out, {"active": True, "f_lo": f_lo, "f_hi": f_hi, "meter_hz": _METER_HZ, "bands": bands_meter}
+
+
+def _deesser(data: "np.ndarray", sr: int, *, f_lo: float = 5000.0, f_hi: float = 9000.0,
+             thresh_db: float = -30.0, ratio: float = 4.0, max_reduction_db: float = 8.0,
+             attack_ms: float = 1.0, release_ms: float = 60.0, amount: float = 1.0) -> tuple["np.ndarray", dict]:
+    """5–9kHz 齒音帶的頻率選擇性向下壓縮。amount 縮放積極度。回 (音訊, meter)。"""
+    amount = float(max(0.0, amount))
+    if amount < 1e-3:
+        return data, {"active": False, "band_hz": [f_lo, f_hi], "meter_hz": _METER_HZ}
+    hp = _lr4_sos(sr, f_lo, "high")
+    lp = _lr4_sos(sr, f_hi, "low")
+    sib = np.empty_like(data)
+    for ch in range(data.shape[1]):
+        sib[:, ch] = sps.sosfilt(lp, sps.sosfilt(hp, data[:, ch]))
+    rest = data - sib
+    eff_thresh = thresh_db - 2.0 * amount
+    eff_ratio = 1.0 + (ratio - 1.0) * amount
+    detect = np.sqrt(np.mean(sib ** 2, axis=1) + 1e-12)
+    level_db = 20.0 * np.log10(detect + 1e-9)
+    over = np.maximum(0.0, level_db - eff_thresh)
+    gr_db = -over * (1.0 - 1.0 / max(eff_ratio, 1.0))
+    gr_db = np.maximum(gr_db, -float(max_reduction_db))
+    tau = max(1.0, (attack_ms + release_ms) / 2.0)
+    a = float(np.exp(-1.0 / (sr * tau / 1000.0)))
+    gr_sm = sps.lfilter([1 - a], [1, -a], gr_db)
+    gain = 10 ** (gr_sm / 20.0)
+    out = rest + sib * gain[:, None]
+    env = _downsample_env_db(gain, sr)
+    active_frac = float(np.mean(gr_sm < -0.1))
+    return out, {"active": True, "band_hz": [f_lo, f_hi], "meter_hz": _METER_HZ, "gr_db": env,
+                 "max_reduction_db": round(float(-min(env)) if env else 0.0, 2),
+                 "active_pct": round(100.0 * active_frac, 1)}
+
+
+def _saturate(data: "np.ndarray", sr: int, *, amount: float = 0.3, asymmetry: float = 0.2) -> "np.ndarray":
+    """溫和諧波飽和(類比暖度 / 人味)+ dry/wet。2× 過取樣抗混疊。RMS 對齊乾訊號(響度由後段決定)。"""
+    amt = float(np.clip(amount, 0.0, 1.0))
+    if amt < 1e-3:
+        return data
+    drive = 1.0 + 4.0 * amt
+    wet = 0.25 + 0.45 * amt
+    up = sps.resample_poly(data, 2, 1, axis=0)
+    x = up * drive
+    tx = np.tanh(x)
+    shaped = tx + asymmetry * amt * (tx ** 2 - np.mean(tx ** 2, axis=0))
+    shaped = shaped / drive
+    down = sps.resample_poly(shaped, 1, 2, axis=0)
+    if down.shape[0] >= data.shape[0]:
+        down = down[: data.shape[0]]
+    else:
+        down = np.pad(down, ((0, data.shape[0] - down.shape[0]), (0, 0)))
+    wetdry = (1.0 - wet) * data + wet * down
+    r_dry = np.sqrt(np.mean(data ** 2) + 1e-12)
+    r_wet = np.sqrt(np.mean(wetdry ** 2) + 1e-12)
+    return wetdry * (r_dry / r_wet)
+
+
+def _residual_corrective_eq(data: "np.ndarray", sr: int, *, genre: str = "auto",
+                            strength: float = 0.6, max_band_db: float = 3.0) -> tuple["np.ndarray", dict]:
+    """在(已處理的)音訊上重新量頻段偏差,套一道溫和的殘差修正 EQ 把差距補滿(±3dB 上限,
+    *strength,避免過修/共振)。這是讓 after 分數真正提高的關鍵。回 (音訊, info)。"""
+    xa, asr = _analysis_signal(data, sr)
+    mono = np.mean(xa, axis=1)
+    f, pxx = _welch_psd(mono, asr)
+    band_db = _band_levels_db(f, pxx)
+    meas_mean = float(np.mean(list(band_db.values())))
+    tgt = _target_band_levels(genre)
+    tgt_mean = float(np.mean(list(tgt.values())))
+    applied: dict[str, float] = {}
+    bands: list[tuple] = []
+    for name, _lo, _hi in _BANDS:
+        dev = (band_db[name] - meas_mean) - (tgt[name] - tgt_mean)
+        g = float(np.clip(-dev, -max_band_db, max_band_db)) * float(np.clip(strength, 0.0, 1.0))
+        g = round(g, 2)
+        applied[name] = g
+        if abs(g) > 1e-2:
+            kind, f0, q = _BAND_EQ[name]
+            bands.append((kind, f0, g, q))
+    out = _apply_eq(data, sr, bands) if bands else data
+    return out, {"applied_db": applied, "max_db": max_band_db, "strength": round(float(strength), 2)}
+
+
+def _goniometer(data: "np.ndarray", sr: int) -> dict:
+    """立體聲示波器資料:抽樣 L/R 散點(client 端旋轉成 mid/side)+ 整體 + 各頻段相關/寬度。"""
+    if data.shape[1] < 2 or data.shape[0] == 0:
+        return {"points": [], "correlation": 1.0, "width_index": 0.0, "bands": []}
+    L, R = data[:, 0], data[:, 1]
+    n = L.shape[0]
+    step = max(1, n // _GONIO_POINTS)
+    Ls, Rs = L[::step][:_GONIO_POINTS], R[::step][:_GONIO_POINTS]
+    pts = [[round(float(a), 3), round(float(b), 3)] for a, b in zip(Ls, Rs)]
+
+    def _corr_width(l: "np.ndarray", r: "np.ndarray") -> tuple[float, float]:
+        denom = float(np.sqrt(np.sum(l ** 2) * np.sum(r ** 2)) + 1e-12)
+        corr = float(np.sum(l * r) / denom)
+        mid = 0.5 * (l + r)
+        side = 0.5 * (l - r)
+        rms_mid = float(np.sqrt(np.mean(mid ** 2) + 1e-12))
+        rms_side = float(np.sqrt(np.mean(side ** 2) + 1e-12))
+        return round(corr, 3), round(float(rms_side / (rms_mid + 1e-12)), 3)
+
+    corr, width = _corr_width(L, R)
+    band_out = []
+    for name, lo, hi in (("low", 20.0, 200.0), ("mid", 200.0, 4000.0), ("high", 4000.0, 20000.0)):
+        try:
+            sos = sps.butter(4, [max(lo, 20.0) / (sr / 2.0), min(hi, sr / 2.0 - 1.0) / (sr / 2.0)],
+                             btype="band", output="sos")
+            lb = sps.sosfilt(sos, L)
+            rb = sps.sosfilt(sos, R)
+            c, w = _corr_width(lb, rb)
+        except Exception:
+            c, w = corr, width
+        band_out.append({"name": name, "correlation": c, "width_index": w})
+    return {"points": pts, "correlation": corr, "width_index": width, "bands": band_out}
+
+
 # --------------------------------------------------------------------------- #
 # 主流程
 # --------------------------------------------------------------------------- #
@@ -1107,6 +1344,11 @@ def master(
     ceiling_db: Optional[float] = None,
     auto: bool = False,
     auto_strength: float = 0.7,
+    de_ess: Optional[bool] = None,
+    de_ess_amount: Optional[float] = None,
+    multiband: Optional[bool] = None,
+    saturation: float = 0.0,
+    residual_eq: Optional[bool] = None,
     analyze_result: bool = True,
     progress: Optional[ProgressFn] = None,
 ) -> dict:
@@ -1173,29 +1415,87 @@ def master(
     if eq:
         data = _advanced_eq(data, sr, eq)
 
-    # 2) 壓縮膠合(comp_scale 縮放強度;auto 模式把建議壓縮量折進基底倍率)。
-    #    auto 偵測到「已過度壓縮」(comp_amount=0)時完全不再壓縮 —— 否則會與
-    #    自己的診斷「應降低壓縮」自相矛盾(0.5 基底會殘留約 1.3 的壓縮比)。
-    _emit(progress, 45.0, "動態壓縮 · Compression")
-    comp = dict(preset["comp"])
-    cs = max(0.0, float(comp_scale))
-    if auto and corr:
-        ca = float(corr.get("comp_amount", 0.0))
-        cs = cs * (0.5 + ca) if ca > 1e-6 else 0.0
-    if cs > 1e-6:
-        comp["ratio"] = 1.0 + (comp["ratio"] - 1.0) * cs
-        comp["makeup_db"] = comp["makeup_db"] * cs
-        data = _compress(data, sr, **comp)
+    meters: dict = {}
+    trust = float(np.clip(auto_strength, 0.2, 1.0))
+    stages = ["load", "reference_match" if ref_used else ("corrective_eq" if (auto and corr) else "genre_eq")]
 
-    # 3) 區段感知巨觀動態(主歌/副歌自動增減);auto 模式在使用者未指定時用建議量
+    # 2) 齒音消除(de-ess):auto 由偵測到的 'sibilant' 問題驅動;手動由 de_ess/de_ess_amount
+    deess_amount = 0.0
+    if de_ess_amount is not None:
+        deess_amount = float(max(0.0, de_ess_amount))
+    elif de_ess:
+        deess_amount = 0.5
+    elif de_ess is None and auto and analysis_before:
+        for p in analysis_before.get("problems", []):
+            if p.get("id") == "sibilant":
+                sev = {"low": 0.5, "medium": 0.9, "high": 1.3}.get(p.get("severity"), 0.0)
+                deess_amount = sev * (0.7 + 0.6 * trust)
+    if deess_amount > 1e-3:
+        _emit(progress, 38.0, "齒音消除 · De-essing")
+        try:
+            data, meters["deess"] = _deesser(data, sr, amount=deess_amount)
+            stages.append("de_ess")
+        except Exception:
+            logger.warning("de-ess 失敗(略過,不影響輸出)", exc_info=True)
+
+    # 3) 壓縮:auto(或手動開啟)= 3 頻段多頻段;否則單頻段膠合。
+    #    auto 偵測「已過度壓縮」(comp_amount=0)→ 完全不壓(尊重診斷)。
+    _emit(progress, 48.0, "壓縮 · Compression")
+    cs = max(0.0, float(comp_scale))
+    use_mb = bool(multiband) if multiband is not None else (auto and corr is not None)
+    if use_mb:
+        if auto and corr:
+            ca = float(corr.get("comp_amount", 0.0))
+            mb_amount = ca * (0.6 + 0.8 * trust) * cs
+        else:
+            mb_amount = cs
+        if mb_amount > 1e-3:
+            try:
+                data, meters["multiband"] = _multiband_compress(data, sr, amount=mb_amount)
+                stages.append("multiband")
+            except Exception:
+                logger.warning("多頻段壓縮失敗(略過,不影響輸出)", exc_info=True)
+    else:
+        comp = dict(preset["comp"])
+        if auto and corr:
+            ca = float(corr.get("comp_amount", 0.0))
+            cs2 = cs * (0.5 + ca) if ca > 1e-6 else 0.0
+        else:
+            cs2 = cs
+        if cs2 > 1e-6:
+            comp["ratio"] = 1.0 + (comp["ratio"] - 1.0) * cs2
+            comp["makeup_db"] = comp["makeup_db"] * cs2
+            data = _compress(data, sr, **comp)
+            stages.append("compress")
+
+    # 4) 區段感知巨觀動態(主歌/副歌自動增減);auto 模式在使用者未指定時用建議量
     dyn_eff = float(dynamics)
     if auto and corr and abs(dyn_eff) <= 1e-3:
         dyn_eff = float(corr.get("section_amount", 0.0))
     if abs(dyn_eff) > 1e-3:
         _emit(progress, 60.0, "區段動態 · Macro dynamics")
         data = _macro_dynamics(data, sr, dyn_eff)
+        stages.append("macro_dynamics")
 
-    # 4) 立體聲寬度(明確 width > auto 建議 > 曲風預設)
+    # 5) 諧波飽和(類比暖度 / 人味);auto 給小量膠合,手動由 saturation 參數
+    sat_amount = float(max(0.0, saturation))
+    if auto and sat_amount <= 1e-3:
+        sat_amount = 0.12 + 0.18 * trust
+        if genre in ("rock", "edm", "hiphop", "lofi"):
+            sat_amount += 0.05
+        elif genre in ("acoustic", "ballad"):
+            sat_amount -= 0.05
+        sat_amount = float(np.clip(sat_amount, 0.0, 0.45))
+    if sat_amount > 1e-3:
+        _emit(progress, 66.0, "諧波飽和 · Harmonic glue")
+        try:
+            data = _saturate(data, sr, amount=sat_amount)
+            meters["saturation"] = {"amount": round(sat_amount, 3)}
+            stages.append("saturation")
+        except Exception:
+            logger.warning("諧波飽和失敗(略過,不影響輸出)", exc_info=True)
+
+    # 6) 立體聲寬度(明確 width > auto 建議 > 曲風預設)
     if width is not None:
         w = float(width)
     elif auto and corr:
@@ -1203,8 +1503,21 @@ def master(
     else:
         w = float(preset["width"])
     data = _stereo_width(data, w)
+    stages.append("width")
 
-    # 5) 響度正規化到目標(微推 0.3,補限幅器的些微響度損失,但寧可略低於目標也不超過)。
+    # 7) 二次殘差修正 EQ(auto 或手動開啟):重量 tone 偏差,把第一道留下的殘差補滿
+    #    → after 分析的頻段問題真正被解掉,分數因此顯著提高。
+    do_residual = bool(residual_eq) if residual_eq is not None else (auto and corr is not None)
+    if do_residual:
+        _emit(progress, 70.0, "二次修正 EQ · Residual corrective EQ")
+        try:
+            data, meters["residual_eq"] = _residual_corrective_eq(
+                data, sr, genre=genre, strength=0.6 * trust / 0.7)
+            stages.append("residual_eq")
+        except Exception:
+            logger.warning("二次修正 EQ 失敗(略過,不影響輸出)", exc_info=True)
+
+    # 8) 響度正規化到目標(微推 0.3,補限幅器的些微響度損失,但寧可略低於目標也不超過)。
     _emit(progress, 72.0, f"響度正規化 · {loudness} ({tgt_lufs:g} LUFS)")
     data = _normalize_lufs(data, sr, tgt_lufs + 0.3)
 
@@ -1252,4 +1565,13 @@ def master(
         "ceilingDb": round(ceil, 2),
         "before": analysis_before,
         "after": analysis_after,
+        "meters": _finite_scrub(meters),
+        "goniometer": _finite_scrub(_goniometer(data, sr)),
+        "chain": {
+            "stages": stages,
+            "deEss": round(deess_amount, 3),
+            "multiband": "multiband" in meters,
+            "saturation": round(sat_amount, 3),
+            "residualEq": bool(do_residual),
+        },
     }

@@ -492,3 +492,77 @@
 @media (max-width: 560px) {
   .al-mcards { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   Pro chain visualizations (v0.1.17): live spectrum, goniometer,
+   gain-reduction meters, signal chain.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── live spectrum analyzer ── */
+.al-live { display: flex; flex-direction: column; gap: 3px; margin-top: 8px; }
+.al-live__cvs {
+  width: 100%; height: 96px; display: block;
+  background: var(--al-bg); border: 1px solid var(--al-hairline);
+  border-radius: var(--al-radius-ctrl);
+}
+.al-live__label {
+  font-size: var(--al-text-xs); color: var(--al-ink-muted);
+  font-family: var(--al-font-mono);
+}
+
+/* ── goniometer / stereo imager ── */
+.al-gonio { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+.al-gonio__scope { position: relative; flex: 0 0 auto; }
+.al-gonio__cvs {
+  width: 200px; height: 200px; display: block;
+  background: var(--al-bg); border: 1px solid var(--al-hairline);
+  border-radius: var(--al-radius-ctrl);
+}
+.al-gonio__axis {
+  position: absolute; font-size: 9px; color: var(--al-ink-faint);
+  font-family: var(--al-font-mono); pointer-events: none;
+}
+.al-gonio__axis--m { top: 4px; left: 50%; transform: translateX(-50%); }
+.al-gonio__axis--s { bottom: 4px; right: 6px; }
+.al-gonio__meters { flex: 1 1 200px; display: flex; flex-direction: column; gap: 10px; min-width: 180px; }
+.al-gonio__corr { display: flex; align-items: baseline; justify-content: space-between; }
+.al-gonio__corrlbl { font-size: var(--al-text-xs); color: var(--al-ink-muted); text-transform: uppercase; letter-spacing: var(--al-tracking-caps); }
+.al-gonio__corrval { font-family: var(--al-font-mono); font-size: 19px; color: var(--al-ink); }
+.al-gonio__bands { display: flex; flex-direction: column; gap: 6px; }
+.al-gonio__band { display: grid; grid-template-columns: 2.2em 1fr 2.6em; align-items: center; gap: 8px; }
+.al-gonio__bandname { font-size: var(--al-text-xs); color: var(--al-ink-dim); }
+.al-gonio__bartrack { height: 6px; background: var(--al-surface-2); border-radius: 3px; overflow: hidden; }
+.al-gonio__barfill { height: 100%; background: var(--al-gold); border-radius: 3px; }
+.al-gonio__barfill--warn { background: var(--al-amber); }
+.al-gonio__bandval { font-family: var(--al-font-mono); font-size: var(--al-text-xs); color: var(--al-ink-faint); text-align: right; }
+
+/* ── gain-reduction meters ── */
+.al-gr { display: flex; flex-direction: column; gap: 6px; }
+.al-gr__row { display: grid; grid-template-columns: 3em 1fr 4em; align-items: center; gap: 8px; }
+.al-gr__name { font-size: var(--al-text-xs); color: var(--al-ink-dim); }
+.al-gr__svg {
+  width: 100%; height: 34px; background: var(--al-bg);
+  border: 1px solid var(--al-hairline); border-radius: var(--al-radius-ctrl);
+}
+.al-gr__bars { fill: var(--al-gold); opacity: 0.7; }
+.al-gr__max { font-family: var(--al-font-mono); font-size: var(--al-text-xs); color: var(--al-ink-faint); text-align: right; }
+
+/* ── signal chain ── */
+.al-chain { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 4px; }
+.al-chain__seg { display: inline-flex; align-items: center; gap: 4px; }
+.al-chain__node {
+  font-size: var(--al-text-xs); font-family: var(--al-font-mono);
+  padding: 3px 9px; border-radius: var(--al-radius-chip);
+  background: var(--al-surface); border: 1px solid var(--al-hairline);
+  color: var(--al-ink-faint);
+}
+.al-chain__node--on {
+  color: var(--al-bg); background: var(--al-gold); border-color: var(--al-gold);
+  font-weight: 600;
+}
+.al-chain__arrow { color: var(--al-ink-decor); font-size: var(--al-text-xs); }
+
+@media (max-width: 560px) {
+  .al-gonio { gap: 12px; }
+  .al-gonio__cvs { width: 160px; height: 160px; }
+}

@@ -1,21 +1,22 @@
-# Local Studio v0.1.16
+# Local Studio v0.1.17
 
-🎚️ **Intelligent Auto-Mastering** — the 母帶 mode now *listens to your song*, tells you what's wrong, and fixes it — with full visual feedback.
+🎚️ **A real mastering studio.** The 母帶 mode now runs a full pro signal chain that *listens to the song and adjusts* — and you can watch every stage work, live.
 
-### New — Smart analysis & auto-correction
-- **🔬 It analyzes your mix** the moment you load it: integrated **LUFS, loudness range (LRA), true-peak, dynamics (crest / DR)**, a **7-band frequency balance** vs a pro "target" curve, **stereo width + correlation**, and low-end mono compatibility.
-- **🩺 Plain-language diagnosis** — a 0–100 score plus a prioritized list of real issues it found (muddy low-mids, harsh 2–5 kHz, no air, boomy bass, over-compression, too-narrow image, bass not mono…), each with the fix it will apply.
-- **🪄 Auto-correction** — pick **Auto** and it builds a corrective EQ automatically (**target − measured**): weak highs get air, boomy lows get trimmed, plus smart low-cut / stereo width / section dynamics — all derived from *your* track, not a fixed preset.
-- **🎛️ Naturalness dial** — a new **自動校正力度 (Natural ↔ Strong)** slider lets you choose how far it corrects. Natural keeps your character with light touches; Strong pushes closer to the ideal balance. It never over-corrects (under-corrects on purpose, ±6 dB max, broad musical filters).
+### New — Pro signal chain (not a template)
+- **3-band multiband compressor** (Linkwitz-Riley crossover) — controls low / mid / high dynamics independently, the way real mastering does, instead of one blunt bus compressor.
+- **Auto de-esser** — finds and tames harsh sibilance (5–9 kHz) *only when it spikes*, so vocals stay smooth without going dull.
+- **Harmonic saturation** — subtle analog-style warmth and glue for a more "alive", human feel (2× oversampled, no harshness).
+- **Second corrective-EQ pass** — closes the residual the first pass leaves, so detected problems are genuinely *resolved*. The after-master score jumps much higher than before, and a clean master can now read 85–95 — while an over-compressed or near-mono master honestly still reads low.
 
-### New — Visual feedback
-- **Frequency spectrum** (your mix vs the predicted result vs the target)
-- **Band-balance bars**, **professional metric cards** (colour-coded good/watch/bad)
-- **Section dynamics** view — your song's energy with detected **verse/chorus** regions and the gain curve being applied
-- **Before → after** comparison on the finished master, with the score improvement
+### New — Watch it work
+- **🔊 Live spectrum analyzer** — a real-time frequency display that moves with the music as it plays, on both the original and the mastered track.
+- **🎯 Stereo imager (goniometer)** — see your song's stereo field, with phase-correlation and per-band width meters.
+- **📉 Gain-reduction meters** — per band, so you can *see* exactly how much each part of the spectrum is being compressed.
+- **🔗 Signal-chain view** — EQ → De-ess → Multiband → Saturate → Width → EQ → Limit, lit up by whatever actually ran on your song.
 
-### Unchanged
-- Everything from v0.1.13–v0.1.15 (the base mastering chain, redesigned sidebar, on-demand model setup, reliable updates) works as before. Manual genre presets and the advanced sliders are untouched — Auto is opt-in.
+### Notes
+- **Auto** mode drives the whole chain automatically (scaled by the Natural↔Strong dial). Specific genres + the manual sliders behave exactly as before — the new stages are opt-in.
+- Live visuals only animate while audio is playing (saves battery).
 
 Support: ☕ [Ko-fi](https://ko-fi.com/arieswu) · [PayPal](https://paypal.me/Arieshonghuan) · [GitHub Sponsors](https://github.com/sponsors/AriesHongHuanWu).
 

@@ -108,6 +108,44 @@ export interface MasterAnalysis {
   overall_score: number;
 }
 
+// ── Pro chain meters + stereo imager (v0.1.17) ─────────────────────────────
+export interface BandGR {
+  gr_db: number[];
+  max_gr_db: number;
+}
+export interface MasterMeters {
+  multiband?: {
+    active: boolean;
+    f_lo: number;
+    f_hi: number;
+    meter_hz: number;
+    bands: { low?: BandGR; mid?: BandGR; high?: BandGR };
+  };
+  deess?: {
+    active: boolean;
+    band_hz: [number, number];
+    meter_hz: number;
+    gr_db?: number[];
+    max_reduction_db?: number;
+    active_pct?: number;
+  };
+  saturation?: { amount: number };
+  residual_eq?: { applied_db: Record<string, number>; max_db: number; strength: number };
+}
+export interface GoniometerData {
+  points: [number, number][];
+  correlation: number;
+  width_index: number;
+  bands: { name: string; correlation: number; width_index: number }[];
+}
+export interface ChainState {
+  stages: string[];
+  deEss: number;
+  multiband: boolean;
+  saturation: number;
+  residualEq: boolean;
+}
+
 /** Mastering measurement/summary returned in the job meta. */
 export interface MasterMeta {
   sampleRate: number;
@@ -125,6 +163,12 @@ export interface MasterMeta {
   /** Before/after intelligent analysis for the A/B visualization (auto mode). */
   before?: MasterAnalysis | null;
   after?: MasterAnalysis | null;
+  /** Per-stage meters (multiband GR, de-ess, saturation, residual EQ). */
+  meters?: MasterMeters;
+  /** Stereo imager / goniometer data on the final master. */
+  goniometer?: GoniometerData;
+  /** Which stages ran + their amounts. */
+  chain?: ChainState;
 }
 
 export interface MasterJobStatus {
@@ -158,6 +202,12 @@ export interface MasterAdvanced {
   auto?: boolean;
   /** Auto-correction strength 0.2 (natural) .. 1.0 (strong). Default 0.7. */
   autoStrength?: number;
+  /** Pro chain (v0.1.17): de-esser, multiband comp, saturation, 2nd-pass EQ. */
+  deEss?: boolean;
+  deEssAmount?: number;
+  multiband?: boolean;
+  saturation?: number;
+  residualEq?: boolean;
 }
 
 /** POST /api/master — spawn the background mastering job. */
@@ -188,7 +238,12 @@ export async function createMasterJob(
     add('compScale', a.compScale);
     add('ceiling', a.ceiling);
     add('autoStrength', a.autoStrength);
+    add('deEssAmount', a.deEssAmount);
+    add('saturation', a.saturation);
     if (a.auto) form.append('auto', 'true');
+    if (a.deEss !== undefined) form.append('deEss', String(a.deEss));
+    if (a.multiband !== undefined) form.append('multiband', String(a.multiband));
+    if (a.residualEq !== undefined) form.append('residualEq', String(a.residualEq));
   }
 
   let res: Response;

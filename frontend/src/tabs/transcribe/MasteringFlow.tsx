@@ -22,6 +22,10 @@ import { useMeta } from '../../state/useMeta';
 import { useT } from '../../i18n';
 import type { TFn } from '../../i18n';
 import { AnalysisPanel, ResultCompare } from './mastering/AnalysisPanel';
+import { LiveSpectrum } from './mastering/LiveSpectrum';
+import { Goniometer } from './mastering/Goniometer';
+import { GainReduction } from './mastering/GainReduction';
+import { SignalChain } from './mastering/SignalChain';
 import { fmtDb } from './mastering/vizUtils';
 import './mastering.css';
 
@@ -78,6 +82,10 @@ export function MasteringFlow() {
   const [analysis, setAnalysis] = useState<MasterAnalysis | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const analyzeAbort = useRef<AbortController | null>(null);
+
+  // Captured <audio> DOM nodes for the live WebAudio visualizations.
+  const [srcAudioEl, setSrcAudioEl] = useState<HTMLAudioElement | null>(null);
+  const [resultAudioEl, setResultAudioEl] = useState<HTMLAudioElement | null>(null);
 
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stoppedRef = useRef(false);
@@ -251,7 +259,8 @@ export function MasteringFlow() {
           <div className="al-master__player">
             <span className="al-master__playerlabel">{t('master.original')}</span>
             {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-            <audio src={srcUrl} controls className="al-master__audio" />
+            <audio ref={setSrcAudioEl} src={srcUrl} controls className="al-master__audio" />
+            <LiveSpectrum audioEl={srcAudioEl} tone="gold" label={t('master.live.original')} />
           </div>
         )}
       </section>
@@ -466,8 +475,30 @@ export function MasteringFlow() {
                 <Disc3 size={13} /> {t('master.mastered')}
               </span>
               {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-              <audio src={resultUrl} controls autoPlay className="al-master__audio" />
+              <audio ref={setResultAudioEl} src={resultUrl} controls autoPlay className="al-master__audio" />
+              <LiveSpectrum audioEl={resultAudioEl} tone="green" label={t('master.live.mastered')} />
             </div>
+
+            {resultMeta?.chain && (
+              <div className="al-an__block">
+                <span className="al-an__blocktitle">{t('master.an.chain')}</span>
+                <SignalChain chain={resultMeta.chain} />
+              </div>
+            )}
+
+            {resultMeta?.meters && (resultMeta.meters.multiband?.active || resultMeta.meters.deess?.active) && (
+              <div className="al-an__block">
+                <span className="al-an__blocktitle">{t('master.an.gr')}</span>
+                <GainReduction meters={resultMeta.meters} />
+              </div>
+            )}
+
+            {resultMeta?.goniometer && (
+              <div className="al-an__block">
+                <span className="al-an__blocktitle">{t('master.an.imager')}</span>
+                <Goniometer audioEl={resultAudioEl} data={resultMeta.goniometer} />
+              </div>
+            )}
 
             {resultMeta?.before && resultMeta?.after && (
               <ResultCompare
