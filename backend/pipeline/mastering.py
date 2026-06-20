@@ -241,6 +241,34 @@ def _biquad(kind: str, sr: int, f0: float, gain_db: float, q: float) -> tuple["n
         a0 = (A + 1) + (A - 1) * cw + s
         a1 = -2 * ((A - 1) + (A + 1) * cw)
         a2 = (A + 1) + (A - 1) * cw - s
+    elif kind == "high_pass":
+        b0 = (1 + cw) / 2.0
+        b1 = -(1 + cw)
+        b2 = (1 + cw) / 2.0
+        a0 = 1 + alpha
+        a1 = -2 * cw
+        a2 = 1 - alpha
+    elif kind == "low_pass":
+        b0 = (1 - cw) / 2.0
+        b1 = 1 - cw
+        b2 = (1 - cw) / 2.0
+        a0 = 1 + alpha
+        a1 = -2 * cw
+        a2 = 1 - alpha
+    elif kind == "notch":
+        b0 = 1
+        b1 = -2 * cw
+        b2 = 1
+        a0 = 1 + alpha
+        a1 = -2 * cw
+        a2 = 1 - alpha
+    elif kind == "allpass":
+        b0 = 1 - alpha
+        b1 = -2 * cw
+        b2 = 1 + alpha
+        a0 = 1 + alpha
+        a1 = -2 * cw
+        a2 = 1 - alpha
     else:  # high_shelf
         s = 2 * np.sqrt(A) * alpha
         b0 = A * ((A + 1) + (A - 1) * cw + s)
@@ -1427,6 +1455,96 @@ def _auto_dynamic_eq(data: "np.ndarray", sr: int, analysis_before: Optional[dict
     return data, meters
 
 
+# =========================================================================== #
+# 全參數 EQ(Pro)—— 無限段,每段可選類型/頻率/增益/Q,**每段相位(min/linear)**
+# + **每段聲道路由(stereo/mid/side/L/R)**。線性相位用 _match_eq 同套 FIR 法。
+# =========================================================================== #
+_EQ_TYPES = {"bell", "peak", "low_shelf", "high_shelf", "high_pass", "low_pass", "notch", "allpass"}
+_EQ_CHANNELS = {"stereo", "mid", "side", "left", "right"}
+
+
+def _norm_band(b: dict, sr: int) -> Optional[dict]:
+    """驗證/正規化一個使用者頻段;不合法或無作用回 None。"""
+    if not isinstance(b, dict) or not bool(b.get("enabled", True)):
+        return None
+    t = str(b.get("type", "bell")).lower()
+    t = "bell" if t == "peak" else t
+    if t not in _EQ_TYPES:
+        return None
+    ch = str(b.get("channel", "stereo")).lower()
+    if ch not in _EQ_CHANNELS:
+        ch = "stereo"
+    ph = "linear" if str(b.get("phase", "min")).lower() == "linear" else "min"
+    nyq = sr / 2.0 - 1.0
+    f0 = float(np.clip(float(b.get("freq_hz", b.get("freq", 1000.0)) or 1000.0), 20.0, min(20000.0, nyq)))
+    g = float(b.get("gain_db", b.get("gain", 0.0)) or 0.0)
+    q = float(np.clip(float(b.get("q", 0.707) or 0.707), 0.1, 18.0))
+    pol = -1.0 if int(b.get("polarity", 1) or 1) < 0 else 1.0
+    # 純增益且增益≈0 → 無作用
+    if t in ("bell", "low_shelf", "high_shelf") and abs(g) < 1e-3 and pol > 0:
+        return None
+    return {"type": t, "freq_hz": f0, "gain_db": g, "q": q, "phase": ph, "channel": ch, "polarity": pol}
+
+
+def _param_biquad(b: dict, sr: int) -> tuple["np.ndarray", "np.ndarray"]:
+    kind = "peak" if b["type"] == "bell" else b["type"]
+    return _biquad(kind, sr, b["freq_hz"], b["gain_db"], b["q"])
+
+
+def _run_phase_groups(col: "np.ndarray", sr: int, gbands: list[dict]) -> "np.ndarray":
+    """對單一聲道訊號套用該組頻段:min 相位串接 IIR + 一道合併的線性相位 FIR。"""
+    out = col
+    mn = [b for b in gbands if b["phase"] == "min"]
+    lin = [b for b in gbands if b["phase"] == "linear"]
+    for b in mn:
+        bb, aa = _param_biquad(b, sr)
+        out = sps.lfilter(bb, aa, out)
+        if b["polarity"] < 0:
+            out = -out
+    if lin:
+        n_fft = 8192
+        w = np.linspace(0.0, np.pi, n_fft // 2 + 1)
+        h = np.ones(n_fft // 2 + 1, dtype=np.complex128)
+        for b in lin:
+            bb, aa = _param_biquad(b, sr)
+            _, hb = sps.freqz(bb, aa, worN=w)
+            h *= hb
+        imp = np.fft.irfft(np.abs(h), n=n_fft)
+        imp = np.fft.fftshift(imp) * np.hanning(n_fft)
+        out = sps.fftconvolve(out, imp, mode="same")
+        if sum(1 for b in lin if b["polarity"] < 0) % 2:
+            out = -out
+    return out
+
+
+def _apply_param_eq(data: "np.ndarray", sr: int, raw_bands: list) -> "np.ndarray":
+    """套用一串使用者參數 EQ 頻段(依聲道路由分組:stereo/L/R 直接濾;mid/side 解碼一次)。"""
+    bands = [nb for nb in (_norm_band(b, sr) for b in (raw_bands or [])) if nb is not None]
+    if not bands:
+        return data
+    out = data.astype(np.float64, copy=True)
+    groups: dict[str, list[dict]] = {}
+    for b in bands:
+        groups.setdefault(b["channel"], []).append(b)
+    if "stereo" in groups:
+        out[:, 0] = _run_phase_groups(out[:, 0], sr, groups["stereo"])
+        out[:, 1] = _run_phase_groups(out[:, 1], sr, groups["stereo"])
+    if "left" in groups:
+        out[:, 0] = _run_phase_groups(out[:, 0], sr, groups["left"])
+    if "right" in groups and out.shape[1] > 1:
+        out[:, 1] = _run_phase_groups(out[:, 1], sr, groups["right"])
+    if ("mid" in groups or "side" in groups) and out.shape[1] > 1:
+        mid = 0.5 * (out[:, 0] + out[:, 1])
+        side = 0.5 * (out[:, 0] - out[:, 1])
+        if "mid" in groups:
+            mid = _run_phase_groups(mid, sr, groups["mid"])
+        if "side" in groups:
+            side = _run_phase_groups(side, sr, groups["side"])
+        out[:, 0] = mid + side
+        out[:, 1] = mid - side
+    return out
+
+
 # --------------------------------------------------------------------------- #
 # 主流程
 # --------------------------------------------------------------------------- #
@@ -1450,6 +1568,7 @@ def master(
     saturation: float = 0.0,
     residual_eq: Optional[bool] = None,
     dynamic_eq: Optional[list] = None,
+    param_eq: Optional[list] = None,
     matched_output_path: Optional[str] = None,
     analyze_result: bool = True,
     progress: Optional[ProgressFn] = None,
@@ -1521,6 +1640,15 @@ def master(
     meters: dict = {}
     trust = float(np.clip(auto_strength, 0.2, 1.0))
     stages = ["load", "reference_match" if ref_used else ("corrective_eq" if (auto and corr) else "genre_eq")]
+
+    # 1b) 全參數 EQ(Pro 手動頻段:含 per-band 相位 + Mid/Side/L/R 路由)
+    if param_eq:
+        _emit(progress, 26.0, "參數 EQ · Parametric EQ")
+        try:
+            data = _apply_param_eq(data, sr, param_eq)
+            stages.append("param_eq")
+        except Exception:
+            logger.warning("參數 EQ 失敗(略過,不影響輸出)", exc_info=True)
 
     # 1c) 動態 EQ:只在某頻段「突出」時才修(透明)。手動 dynamic_eq 清單 > auto 依問題放置。
     deq_meters: list = []

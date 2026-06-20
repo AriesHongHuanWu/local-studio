@@ -611,3 +611,54 @@
 }
 .al-ab__extupload:hover { color: var(--al-ink); border-color: var(--al-ink-faint); }
 .al-ab__exterr { font-size: var(--al-text-xs); color: var(--al-error); }
+
+/* ── Pro parametric EQ ── */
+.al-peq { display: flex; flex-direction: column; gap: 10px; }
+.al-peq__svg {
+  width: 100%; height: auto; background: var(--al-bg);
+  border: 1px solid var(--al-hairline); border-radius: var(--al-radius-ctrl);
+  touch-action: none;
+}
+.al-peq__grid { stroke: var(--al-hairline); stroke-width: 1; }
+.al-peq__zero { stroke: var(--al-hairline-strong); stroke-width: 1.2; }
+.al-peq__axis { fill: var(--al-ink-faint); font-size: 9px; font-family: var(--al-font-mono); }
+.al-peq__curve { stroke: var(--al-gold); stroke-width: 2; stroke-linejoin: round; }
+.al-peq__node {
+  fill: var(--al-surface); stroke: var(--al-gold); stroke-width: 2;
+  cursor: grab; transition: r .1s;
+}
+.al-peq__node--sel { fill: var(--al-gold); }
+.al-peq__node--off { stroke: var(--al-ink-faint); opacity: .5; }
+.al-peq__node:active { cursor: grabbing; }
+.al-peq__bar { display: flex; align-items: center; gap: 12px; }
+.al-peq__add {
+  display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
+  font: inherit; font-size: var(--al-text-sm); color: var(--al-bg);
+  background: var(--al-gold); border: none; border-radius: var(--al-radius-ctrl);
+  padding: 5px 12px; font-weight: 600;
+}
+.al-peq__count { font-size: var(--al-text-xs); color: var(--al-ink-muted); }
+.al-peq__ctrls {
+  display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap;
+  padding: 10px 12px; background: var(--al-surface); border: 1px solid var(--al-hairline);
+  border-radius: var(--al-radius-ctrl);
+}
+.al-peq__field { display: flex; flex-direction: column; gap: 3px; }
+.al-peq__field > span { font-size: 10px; color: var(--al-ink-muted); text-transform: uppercase; letter-spacing: .08em; }
+.al-peq__field select, .al-peq__field input {
+  font: inherit; font-size: var(--al-text-sm); color: var(--al-ink);
+  background: var(--al-surface-2); border: 1px solid var(--al-hairline);
+  border-radius: var(--al-radius-ctrl); padding: 5px 8px; min-width: 4.5em;
+}
+.al-peq__field input[type="number"] { width: 5em; }
+.al-peq__seg { display: inline-flex; border: 1px solid var(--al-hairline); border-radius: var(--al-radius-ctrl); overflow: hidden; }
+.al-peq__seg button {
+  font: inherit; font-size: var(--al-text-xs); cursor: pointer;
+  background: var(--al-surface-2); color: var(--al-ink-dim); border: none; padding: 6px 10px;
+}
+.al-peq__seg button.on { background: var(--al-gold); color: var(--al-bg); font-weight: 600; }
+.al-peq__del {
+  cursor: pointer; background: transparent; border: 1px solid var(--al-hairline);
+  color: var(--al-ink-muted); border-radius: var(--al-radius-ctrl); padding: 6px 8px;
+}
+.al-peq__del:hover { color: var(--al-error); border-color: var(--al-error); }

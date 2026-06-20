@@ -17,6 +17,9 @@ import {
 import { Button, Eyebrow } from '../../components/primitives';
 import { createMasterJob, getMasterJob, masterResultUrl, masterMatchedUrl, matchAudio, analyzeMaster } from '../../api/master';
 import { ABCompare } from './mastering/ABCompare';
+import { ParametricEQ, newBand } from './mastering/ParametricEQ';
+import { toBackendBands } from './mastering/eqMath';
+import type { EqBand } from './mastering/eqMath';
 import { saveBinaryUrl } from '../export/saveFile';
 import type { MasterLoudness, MasterMeta, MasterAnalysis } from '../../api/master';
 import { ApiError } from '../../api/client';
@@ -56,6 +59,10 @@ export function MasteringFlow() {
 
   // Auto-correction strength (0.2 natural ↔ 1.0 strong) for intelligent mode.
   const [autoStrength, setAutoStrength] = useState(0.6);
+
+  // Pro mode: a fully-parametric EQ (per-band phase + Mid/Side/L/R routing).
+  const [proMode, setProMode] = useState(false);
+  const [paramBands, setParamBands] = useState<EqBand[]>([]);
 
   // Section macro-dynamics (−1 balance ↔ +1 punch) + advanced manual params.
   const [dynamics, setDynamics] = useState(0);
@@ -224,6 +231,7 @@ export function MasteringFlow() {
           ceiling,
           auto: genre === 'auto',
           autoStrength,
+          paramEq: proMode && paramBands.some((b) => b.enabled) ? JSON.stringify(toBackendBands(paramBands)) : undefined,
         });
         if (stoppedRef.current) return;
         pollTimer.current = setTimeout(() => void poll(jobId), POLL_MS);
@@ -235,7 +243,7 @@ export function MasteringFlow() {
         setPhase('error');
       }
     })();
-  }, [file, genre, loudness, reference, dynamics, width, eqBass, eqLowMid, eqPresence, eqAir, compScale, ceiling, autoStrength, poll, t]);
+  }, [file, genre, loudness, reference, dynamics, width, eqBass, eqLowMid, eqPresence, eqAir, compScale, ceiling, autoStrength, proMode, paramBands, poll, t]);
 
   // Three-way A/B/C: upload an external master → loudness-match it to OUR
   // master's output LUFS → add as the C source for an original/ours/theirs shoot-out.
@@ -472,6 +480,29 @@ export function MasteringFlow() {
             <button type="button" className="al-master__advreset" onClick={resetAdv} disabled={running}>
               {t('master.adv.reset')}
             </button>
+          </div>
+        )}
+      </section>
+
+      {/* PRO — fully-parametric EQ (per-band phase + Mid/Side/L/R) */}
+      <section className="al-section">
+        <button
+          type="button"
+          className="al-master__advtoggle"
+          onClick={() => {
+            const next = !proMode;
+            setProMode(next);
+            if (next && paramBands.length === 0) setParamBands([newBand()]);
+          }}
+          aria-expanded={proMode}
+        >
+          {proMode ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+          <SlidersHorizontal size={14} /> {t('master.pro.toggle')}
+        </button>
+        {proMode && (
+          <div className="al-master__adv">
+            <p className="al-master__hint">{t('master.pro.hint')}</p>
+            <ParametricEQ bands={paramBands} onChange={setParamBands} />
           </div>
         )}
       </section>

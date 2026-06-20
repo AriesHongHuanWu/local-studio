@@ -1,20 +1,25 @@
-# Local Studio v0.1.22
+# Local Studio v0.1.23
 
-⬇️ **Fix: download your master.** Plus a **three-way A/B/C** so you can put this app head-to-head with LANDR / Ozone / any external master.
+🎛️ **Pro mode — a fully-parametric EQ** with per-band phase and Mid/Side routing. This is the deep, hands-on control a mastering engineer expects.
 
-### Fixed
-- **Download works again.** The "download master" button silently did nothing in the desktop app — it tried a cross-origin link the webview blocks. It now **fetches the WAV and saves it** through a proper save dialog (or a browser download), with a "Saved ✓" confirmation.
+### New — Pro: parametric EQ
+Open **Pro 進階:全參數 EQ** under the mastering controls and you get a real parametric EQ:
+- **Draggable response curve** — grab a band node and drag (frequency ↔ left/right, gain ↔ up/down); the curve updates instantly.
+- **Add as many bands as you need**, each with its own:
+  - **Type** — Bell · Low/High shelf · High-pass · Low-pass · Notch · All-pass
+  - **Frequency · Gain · Q**
+  - **Phase** — **Natural (minimum-phase)** or **Linear-phase** (zero phase distortion), *per band*
+  - **Channel** — **Stereo · Mid · Side · Left · Right** — EQ only the centre, only the sides, or one channel
+- It runs as its own stage in the signal chain, on top of (or instead of) the automatic correction.
 
-### New — three-way comparison (original vs ours vs theirs)
-- In the result, **add an external master** (drag in a version mastered by LANDR, Ozone, or anyone) and compare **A · this app · B · original · C · external** — all at the **same loudness**, so you judge tone and dynamics, not volume.
-- One click (or the **A / B / C** keys) switches instantly, in sync, at the same position. The external file is loudness-matched for you automatically.
-- This is the honest way to prove a master: hear all three side by side, level-matched.
+This directly answers "the phase isn't complete enough / I want way more control": now every band has its own phase mode and its own channel routing.
 
 ### Notes
-- All comparison playback is native audio (no Web Audio) — verified to actually play.
+- The curve is computed live in the app (instant feedback); the engine applies the exact same bands.
+- More Pro tools (manual multiband, per-band width) are coming next.
 
 ### Unchanged
-- All prior mastering (multiband, de-esser, saturation, dynamic EQ, 2nd-pass EQ) + the loudness-matched A/B work as before.
+- Auto mode, dynamic EQ, the loudness-matched A/B + three-way comparison, and the download fix all work as before.
 
 Support: ☕ [Ko-fi](https://ko-fi.com/arieswu) · [PayPal](https://paypal.me/Arieshonghuan) · [GitHub Sponsors](https://github.com/sponsors/AriesHongHuanWu).
 

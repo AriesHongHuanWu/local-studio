@@ -222,6 +222,8 @@ export interface MasterAdvanced {
   multiband?: boolean;
   saturation?: number;
   residualEq?: boolean;
+  /** Pro mode: JSON-stringified parametric EQ band array. */
+  paramEq?: string;
 }
 
 /** POST /api/master — spawn the background mastering job. */
@@ -258,6 +260,7 @@ export async function createMasterJob(
     if (a.deEss !== undefined) form.append('deEss', String(a.deEss));
     if (a.multiband !== undefined) form.append('multiband', String(a.multiband));
     if (a.residualEq !== undefined) form.append('residualEq', String(a.residualEq));
+    if (a.paramEq) form.append('paramEq', a.paramEq);
   }
 
   let res: Response;

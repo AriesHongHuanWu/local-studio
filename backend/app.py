@@ -1795,6 +1795,20 @@ def api_get_caption_result(job_id: str) -> FileResponse:
 # 自動母帶 (mastering / Auto-Mastering) 端點群 —— 「母帶」模式。
 # 把一首混音處理成可發佈母帶(EQ/壓縮/寬度/響度/限幅)。重相依缺席時回 503。
 # ─────────────────────────────────────────────────────────────────────────────
+def _parse_param_eq(raw: Optional[str]) -> Optional[list]:
+    """Parse the paramEq JSON form field → list of band dicts (or None). Caps at 24
+    bands; any parse error degrades to None (no parametric EQ) rather than failing."""
+    if not raw:
+        return None
+    try:
+        bands = json.loads(raw)
+        if isinstance(bands, list) and bands:
+            return [b for b in bands if isinstance(b, dict)][:24]
+    except (ValueError, TypeError):
+        pass
+    return None
+
+
 def _require_mastering() -> None:
     if not _mastering_available():
         raise HTTPException(
@@ -1855,6 +1869,7 @@ def _run_master_job(
             multiband=opts.get("multiband"),
             saturation=opts.get("saturation", 0.0),
             residual_eq=opts.get("residual_eq"),
+            param_eq=opts.get("param_eq"),
             progress=progress,
         )
         with _MASTER_JOBS_LOCK:
@@ -1906,6 +1921,7 @@ async def api_master(
     multiband: Optional[bool] = Form(None),
     saturation: Optional[float] = Form(None),
     residualEq: Optional[bool] = Form(None),
+    paramEq: Optional[str] = Form(None),
 ) -> JSONResponse:
     """建立母帶工作。multipart:audio=混音檔,genre,loudness,選用 reference=參考曲,
     以及選用的進階參數(width/dynamics/eq*/compScale/ceiling)。
@@ -1939,6 +1955,7 @@ async def api_master(
         "multiband": bool(multiband) if multiband is not None else None,
         "saturation": _f(saturation, 0.0, 1.0) if saturation is not None else 0.0,
         "residual_eq": bool(residualEq) if residualEq is not None else None,
+        "param_eq": _parse_param_eq(paramEq),
     }
 
     valid_genres = [g["key"] for g in mastering.genres()] if mastering is not None else ["auto"]  # type: ignore[union-attr]
