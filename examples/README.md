@@ -111,4 +111,4 @@ syllables a recognizer is least sure about.
 ---
 
 Made by **Aries HongHuan Wu** · Ai Caption · MIT.
-Repo: <https://github.com/AriesHongHuanWu/ai-caption>
+Repo: <https://github.com/AriesHongHuanWu/local-studio>

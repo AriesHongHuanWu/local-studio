@@ -1,26 +1,21 @@
-# Local Studio v0.1.29
+# Local Studio v0.1.30
 
-🎚️ **AI stem mastering** — the headline feature. AI splits your mix into **drums, bass, vocals and other**, you rebalance their levels, and the result is mastered. Rescue a buried vocal or a boomy low end the way iZotope Ozone's Master Rebalance does — fully local, free.
+🎛️ **See what the AI is doing** — the intelligent mastering now *draws its EQ* as a curve, and the de-esser tracks the actual sibilance. Plus the project has a new home.
 
-### New — AI stem rebalance (Demucs)
-Open **Pro 進階** → **AI 分軌重新平衡 (Demucs)**:
-- AI (Demucs) separates the mix into **🥁 Drums · 🎸 Bass · 🎤 Vocals · 🎹 Other**.
-- Set each stem's level (±12 dB), and the rebalanced mix is mastered as usual.
-- Runs on your GPU (falls back to CPU); takes ~1–3 minutes, with a live progress bar.
-- After the master, a chip confirms exactly what was applied (e.g. "🎚️ Stems rebalanced: 🎤 Vocals +6 · 🎸 Bass −4").
+### New — AI auto-EQ curve
+When you drop a mix, the analysis panel now shows an **AI auto-EQ curve** — the exact corrective EQ the intelligent mode is applying, drawn as a frequency curve (boosts above the line, cuts below). No more guessing what "auto" did to your tone; you can see it.
 
-This completes the AI mastering pair with the v0.1.28 genre detection.
+### Improved — adaptive de-esser
+De-essing in auto mode now **finds the real sibilance frequency** (where the "ess/sh" energy actually sits, 4.5–11 kHz) and de-esses there, instead of a fixed band — so it tracks each singer/mic instead of a one-size-fits-all setting.
 
-### Built carefully (16-finding adversarial review)
-Shipped after a deep review of the feature. The fixes that matter:
-- **Honest A/B** — the "before" you compare against is now your **true original**, not the AI's lossy reconstruction, and it's correctly loudness-matched to the master.
-- **No distortion from big boosts** — the rebalanced mix is gain-staged back to a sane level before compression/saturation, so a +12 dB stem boost doesn't drive the chain into clipping.
-- **No wasted time** — if every stem is left at 0 dB, the multi-minute separation is skipped entirely.
-- **Honest feedback** — if AI separation is unavailable, the toggle is disabled with an explanation, and you're told plainly if a run was skipped (instead of silently mastering the original).
-- **Stable under load** — separation is serialized (one at a time) with a VRAM pre-check, so it can't race the model or exhaust an 8 GB GPU.
+### Project renamed → local-studio
+The GitHub repo is now **[local-studio](https://github.com/AriesHongHuanWu/local-studio)** (was `ai-caption`). Your existing installs keep updating normally — GitHub redirects the old links automatically, and the app's internal update identity is unchanged.
 
 ### Unchanged
-- EQ automation lanes, manual multiband, adaptive EQ, Pro parametric EQ, genre detection, A/B + three-way comparison, and download all work as before.
+- AI stem mastering, genre detection, EQ automation lanes, manual multiband, adaptive EQ, Pro parametric EQ, A/B + three-way comparison, and download all work as before.
+
+### Coming next
+More of the auto-mastering upgrade (more auto-detected fixes, compression and effects), then low-end-laptop compatibility, a categorized + pinnable tool sidebar, and clearer positioning for artists and content creators.
 
 Support: ☕ [Ko-fi](https://ko-fi.com/arieswu) · [PayPal](https://paypal.me/Arieshonghuan) · [GitHub Sponsors](https://github.com/sponsors/AriesHongHuanWu).
 

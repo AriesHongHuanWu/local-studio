@@ -48,6 +48,8 @@ export interface AnalysisSection {
 
 export interface MasterCorrections {
   eq_band_gains_db: Record<string, number>;
+  /** Combined auto-EQ frequency response curve (for visualization). */
+  eq_curve?: { f: number; db: number }[];
   low_cut_hz: number;
   mono_below_hz: number;
   comp_amount: number;

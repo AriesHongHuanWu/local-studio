@@ -73,7 +73,7 @@ You can also re-run a release for an existing tag manually: Actions → **Releas
 
 ## GitHub secrets
 
-Set these on the repo (`AriesHongHuanWu/ai-caption`) once. The signing
+Set these on the repo (`AriesHongHuanWu/local-studio`) once. The signing
 secrets are **required** for the updater `.sig` files; the Apple ones are
 optional (see §6).
 
@@ -273,7 +273,7 @@ By default it writes
 | `--version X.Y.Z`| override the version (default: from `tauri.conf.json`)      |
 | `--tag vX.Y.Z`   | tag used in the download URL (default: `v<version>`)       |
 | `--notes "..."`  | inline release notes (instead of `--notes-file`)           |
-| `--repo o/r`     | GitHub `owner/repo` (default: `AriesHongHuanWu/ai-caption`) |
+| `--repo o/r`     | GitHub `owner/repo` (default: `AriesHongHuanWu/local-studio`) |
 | `--out PATH`     | output path for `latest.json`                              |
 | `--setup PATH`   | explicit installer path (skips auto-discovery)             |
 
@@ -285,7 +285,7 @@ cat frontend/src-tauri/target/release/bundle/latest.json
 
 The `url` MUST be the exact filename you will upload, under the tag you will
 create:
-`https://github.com/AriesHongHuanWu/ai-caption/releases/download/v<version>/<setup.exe>`
+`https://github.com/AriesHongHuanWu/local-studio/releases/download/v<version>/<setup.exe>`
 
 ---
 
@@ -319,7 +319,7 @@ gh release create v0.2.0 \
 5. Ensure **Set as the latest release** is checked, then **Publish**.
 
 > **Critical — the `latest` pointer.** The updater endpoint is
-> `https://github.com/AriesHongHuanWu/ai-caption/releases/latest/download/latest.json`.
+> `https://github.com/AriesHongHuanWu/local-studio/releases/latest/download/latest.json`.
 > GitHub resolves `/releases/latest/` to the release marked **"Latest"**. So the
 > newest release MUST be flagged as latest (it is by default for the highest
 > non-prerelease SemVer tag). Do **not** mark the release as a *pre-release* or

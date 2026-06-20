@@ -36,7 +36,7 @@ Ai Caption collects no data from anyone, including children.
 If this policy ever changes, the updated version will be committed to this repository with a new "Last updated" date.
 
 ### Contact
-Questions? Open an issue: <https://github.com/AriesHongHuanWu/ai-caption/issues>
+Questions? Open an issue: <https://github.com/AriesHongHuanWu/local-studio/issues>
 
 ---
 
@@ -68,4 +68,4 @@ Ai Caption 不向任何人(包含兒童)收集資料。
 若本政策變更,新版本會以新的「最後更新」日期提交至本儲存庫。
 
 ### 聯絡
-有疑問?開 issue:<https://github.com/AriesHongHuanWu/ai-caption/issues>
+有疑問?開 issue:<https://github.com/AriesHongHuanWu/local-studio/issues>

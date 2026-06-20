@@ -266,6 +266,7 @@ export const common: Record<string, Entry> = {
   // Analysis panel block titles
   'master.an.metrics': { zh: '專業量測', en: 'Pro metrics' },
   'master.an.spectrum': { zh: '頻譜', en: 'Spectrum' },
+  'master.an.eqCurve': { zh: 'AI 自動 EQ 曲線', en: 'AI auto-EQ curve' },
   'master.an.bands': { zh: '頻段平衡', en: 'Band balance' },
   'master.an.sections': { zh: '區段動態（主歌／副歌）', en: 'Section dynamics' },
   'master.an.compare': { zh: '處理前後頻譜', en: 'Before → after spectrum' },
@@ -276,6 +277,8 @@ export const common: Record<string, Entry> = {
   'master.viz.before': { zh: '原始', en: 'Original' },
   'master.viz.predicted': { zh: '預測', en: 'Predicted' },
   'master.viz.target': { zh: '目標', en: 'Target' },
+  'master.viz.eqCurve': { zh: 'AI 修正 EQ', en: 'AI corrective EQ' },
+  'master.viz.eqCurveAria': { zh: 'AI 自動 EQ 響應曲線', en: 'AI auto-EQ response curve' },
   'master.viz.spectrumAria': { zh: '頻譜曲線', en: 'Frequency spectrum' },
   'master.viz.bandsAria': { zh: '頻段平衡長條圖', en: 'Band balance bars' },
   'master.viz.sectionsAria': { zh: '區段能量與增益', en: 'Section energy and gain' },

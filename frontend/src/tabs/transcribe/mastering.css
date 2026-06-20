@@ -573,6 +573,9 @@
   border: 1px solid var(--al-hairline); border-radius: var(--al-radius-ctrl);
 }
 .al-spec__grid { stroke: var(--al-hairline); stroke-width: 1; }
+.al-spec__zero { stroke: var(--al-ink-faint); stroke-width: 0.8; stroke-dasharray: 2 2; opacity: 0.5; }
+.al-eqc__range { font-family: var(--al-font-mono); font-size: var(--al-text-xs); color: var(--al-ink-faint); margin-left: auto; }
+.al-eqc__line { stroke: var(--al-gold); stroke-width: 1.8; stroke-linejoin: round; }
 .al-spec__axislbl { fill: var(--al-ink-faint); font-size: 9px; font-family: var(--al-font-mono); }
 .al-spec__before { stroke: var(--al-gold); stroke-width: 2; stroke-linejoin: round; }
 .al-spec__after { stroke: var(--al-green); stroke-width: 1.6; stroke-dasharray: 4 3; stroke-linejoin: round; }

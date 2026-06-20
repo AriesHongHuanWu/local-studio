@@ -6,7 +6,7 @@ If you discover a security issue in Ai Caption, please report it **privately** f
 
 如果你發現 Ai Caption 的安全問題,請先**私下**回報 —— 不要為可被利用的漏洞開公開 issue。
 
-- Preferred: GitHub **Security Advisories** → <https://github.com/AriesHongHuanWu/ai-caption/security/advisories/new>
+- Preferred: GitHub **Security Advisories** → <https://github.com/AriesHongHuanWu/local-studio/security/advisories/new>
 - Or open a minimal issue asking the maintainer to make contact, without exploit details.
 
 Please include: affected version, OS, reproduction steps, and impact. We aim to acknowledge within a few days.

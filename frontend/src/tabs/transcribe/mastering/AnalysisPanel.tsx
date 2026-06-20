@@ -10,6 +10,7 @@
 import { useT } from '../../../i18n';
 import type { MasterAnalysis } from '../../../api/master';
 import { SpectrumChart } from './SpectrumChart';
+import { AutoEqCurve } from './AutoEqCurve';
 import { BandBars } from './BandBars';
 import { AnalysisCards } from './AnalysisCards';
 import { ProblemList } from './ProblemList';
@@ -38,6 +39,11 @@ export function AnalysisPanel({ analysis, targetLufs }: {
       <Block title={t('master.an.spectrum')}>
         <SpectrumChart spectrum={analysis.spectrum} showAfter />
       </Block>
+      {analysis.corrections?.eq_curve && analysis.corrections.eq_curve.length > 1 && (
+        <Block title={t('master.an.eqCurve')}>
+          <AutoEqCurve curve={analysis.corrections.eq_curve} />
+        </Block>
+      )}
       <Block title={t('master.an.bands')}>
         <BandBars bands={analysis.bands} problems={analysis.problems} />
       </Block>

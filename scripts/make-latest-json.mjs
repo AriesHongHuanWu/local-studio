@@ -34,7 +34,7 @@
        --date 2026-06-19T12:00:00Z \
        --notes-file NOTES.md \
        [--version 0.2.0] [--tag v0.2.0] \
-       [--repo AriesHongHuanWu/ai-caption] \
+       [--repo AriesHongHuanWu/local-studio] \
        [--target windows-x86_64] \
        [--out frontend/src-tauri/target/release/bundle/latest.json] \
        [--bundle-dir <path to .../bundle>]
@@ -49,7 +49,7 @@
      --date <iso>        pub_date. REQUIRED for reproducible output — this
                          script never calls Date.now(); pass an explicit
                          timestamp (e.g. the GitHub release's published_at).
-     --repo <owner/repo> GitHub "owner/repo". Default: AriesHongHuanWu/ai-caption.
+     --repo <owner/repo> GitHub "owner/repo". Default: AriesHongHuanWu/local-studio.
      --target <id>       Updater platform key. Default: windows-x86_64.
      --bundle-dir <p>    Override the bundle dir to scan for artifacts.
      --setup <p>         Explicit path to the *-setup.exe (skips discovery).
@@ -70,7 +70,7 @@ const REPO_ROOT = path.resolve(__dirname, '..');
 const SRC_TAURI = path.join(REPO_ROOT, 'frontend', 'src-tauri');
 const TAURI_CONF = path.join(SRC_TAURI, 'tauri.conf.json');
 const DEFAULT_BUNDLE_DIR = path.join(SRC_TAURI, 'target', 'release', 'bundle');
-const DEFAULT_REPO = 'AriesHongHuanWu/ai-caption';
+const DEFAULT_REPO = 'AriesHongHuanWu/local-studio';
 const DEFAULT_TARGET = 'windows-x86_64';
 
 // ── Tiny arg parser (--key value  and  --flag) ──────────────────────────────

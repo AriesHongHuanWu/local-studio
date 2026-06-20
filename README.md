@@ -13,7 +13,7 @@ Turn any **video or audio** into clean **subtitles** (SRT / WebVTT), or turn any
 ![Tauri](https://img.shields.io/badge/Tauri-v2-FFC131?logo=tauri&logoColor=black)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
 ![Rust](https://img.shields.io/badge/Rust-stable-000000?logo=rust&logoColor=white)
-[![CI](https://github.com/AriesHongHuanWu/ai-caption/actions/workflows/ci.yml/badge.svg)](https://github.com/AriesHongHuanWu/ai-caption/actions/workflows/ci.yml)
+[![CI](https://github.com/AriesHongHuanWu/local-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/AriesHongHuanWu/local-studio/actions/workflows/ci.yml)
 
 **English** · [中文版 ↓](#-中文版)
 
@@ -22,7 +22,7 @@ Turn any **video or audio** into clean **subtitles** (SRT / WebVTT), or turn any
      docs/assets/demo.gif and uncomment the line below before the public launch.
      ![Ai Caption demo](docs/assets/demo.gif) -->
 
-**▶ Demo** — _hero GIF coming soon_ (a 7-second clip of the caption document playing itself, the active word sweeping gold). Until then, [grab a build](https://github.com/AriesHongHuanWu/ai-caption/releases) and try a video or song of your own.
+**▶ Demo** — _hero GIF coming soon_ (a 7-second clip of the caption document playing itself, the active word sweeping gold). Until then, [grab a build](https://github.com/AriesHongHuanWu/local-studio/releases) and try a video or song of your own.
 
 </div>
 
@@ -30,7 +30,7 @@ Turn any **video or audio** into clean **subtitles** (SRT / WebVTT), or turn any
 
 ## 🇬🇧 What is Ai Caption?
 
-Ai Caption ([repo: **ai-caption**](https://github.com/AriesHongHuanWu/ai-caption)) is a free, open-source (MIT) **local-first desktop app** for AI captioning — it does **two** jobs:
+Ai Caption ([repo: **local-studio**](https://github.com/AriesHongHuanWu/local-studio)) is a free, open-source (MIT) **local-first desktop app** for AI captioning — it does **two** jobs:
 
 - 🎬 **Video → Subtitles** — transcribe any video or audio file into clean, ready-to-use **subtitles** (SRT / WebVTT) in the original language. No vocal separation, no reference text — just drop a file and get captions.
 - 🎵 **Song → Lyrics** — turn a song into **word-level timed lyrics** — LRC (line/word), SRT, **ASS karaoke** (`\k` sweep), or JSON — using a music-tuned pipeline (vocal separation + forced alignment).
@@ -115,7 +115,7 @@ flowchart TB
 
 ### Download
 
-Desktop installers live on **[Releases](https://github.com/AriesHongHuanWu/ai-caption/releases)** (`Ai Caption_x.y.z_x64-setup.exe` / `.msi`).
+Desktop installers live on **[Releases](https://github.com/AriesHongHuanWu/local-studio/releases)** (`Ai Caption_x.y.z_x64-setup.exe` / `.msi`).
 
 - **Windows** — grab the binary from Releases. On first launch the **setup wizard** detects your hardware, recommends a model, builds a local Python environment, and downloads the engine for you (requires Python 3.10–3.12 on your system).
 - **macOS / Linux** — build from source (see below). **Help wanted on macOS/Linux packaging** — PRs welcome.
@@ -206,7 +206,7 @@ Issues and PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). See also [PRI
 
 把任何**影片或音訊**變成乾淨的**字幕**(SRT / WebVTT),或把任何**歌曲**變成**字級時間軸**的歌詞(LRC / SRT / ASS-karaoke / JSON),全程在你自己的電腦上跑,**不上傳雲端、不需帳號、不追蹤**。免費開源(MIT)。**任何筆電都能跑 —— 不需要獨立顯卡。**
 
-Ai Caption([儲存庫:**ai-caption**](https://github.com/AriesHongHuanWu/ai-caption))是一款**本地優先的桌面 App**,做兩件事:
+Ai Caption([儲存庫:**local-studio**](https://github.com/AriesHongHuanWu/local-studio))是一款**本地優先的桌面 App**,做兩件事:
 
 - 🎬 **影片轉字幕**:把任何影片或音訊轉成乾淨、可直接使用的**字幕**(SRT / WebVTT),維持原語言。不做人聲分離、不需參考文字 —— 丟檔即出字幕。
 - 🎵 **歌曲轉歌詞**:用音樂專用管線(人聲分離 + 強制對齊)把歌曲變成**逐字時間軸**的歌詞(LRC / SRT / ASS 卡拉OK / JSON)。
@@ -289,7 +289,7 @@ flowchart TB
 
 ### 📦 下載
 
-桌面安裝檔在 **[Releases](https://github.com/AriesHongHuanWu/ai-caption/releases)**(`Ai Caption_x.y.z_x64-setup.exe` / `.msi`)。
+桌面安裝檔在 **[Releases](https://github.com/AriesHongHuanWu/local-studio/releases)**(`Ai Caption_x.y.z_x64-setup.exe` / `.msi`)。
 
 - **Windows**:從 Releases 下載 binary。第一次開啟時,**首啟精靈**會偵測硬體、推薦模型、建立本機 Python 環境並下載引擎(需系統已裝 Python 3.10–3.12)。
 - **macOS / Linux**:請從原始碼建置(見下)。**macOS/Linux 打包徵求協助** —— 歡迎 PR。

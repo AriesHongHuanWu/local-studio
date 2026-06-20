@@ -299,6 +299,35 @@ def _apply_eq(data: "np.ndarray", sr: int, bands: list[tuple]) -> "np.ndarray":
     return out
 
 
+def _eq_response_curve(bands: list[tuple], sr: int, low_cut_hz: float = 0.0,
+                       npts: int = 96) -> list[dict]:
+    """把一組 EQ biquad(kind,f0,gain_db,q)+ 可選低切 串接,算出綜合頻率響應曲線(供 UI 畫
+    『自動 EQ 曲線』)。回 [{f, db}] 於 20Hz–Nyquist 的對數頻率格點。"""
+    ny = sr / 2.0
+    f = np.geomspace(20.0, min(20000.0, ny - 100.0), npts)
+    worN = 2.0 * np.pi * f / sr
+    h = np.ones(npts, dtype=complex)
+    for (kind, f0, gain_db, q) in bands:
+        if abs(float(gain_db)) < 1e-3:
+            continue
+        try:
+            b, a = _biquad(str(kind), sr, float(f0), float(gain_db), float(q))
+            _, hi = sps.freqz(b, a, worN=worN)
+            h = h * hi
+        except Exception:
+            continue
+    if low_cut_hz and float(low_cut_hz) > 20.0:
+        try:
+            b, a = _biquad("high_pass", sr, float(low_cut_hz), 0.0, 0.707)
+            _, hi = sps.freqz(b, a, worN=worN)
+            h = h * hi
+        except Exception:
+            pass
+    db = 20.0 * np.log10(np.abs(h) + 1e-9)
+    return [{"f": round(float(ff), 1), "db": round(float(np.clip(d, -24.0, 24.0)), 2)}
+            for ff, d in zip(f, db)]
+
+
 # --------------------------------------------------------------------------- #
 # 參考曲頻率響應匹配(FFT)
 # --------------------------------------------------------------------------- #
@@ -1071,6 +1100,10 @@ def analyze(data: "np.ndarray", sr: int, *, genre: str = "auto",
     problems = _detect_problems(band_dev, dyn, spec, stereo)
     corrections = _auto_corrections(band_dev, dyn, stereo, genre, strength)
     sec_amt = corrections["section_amount"] if section_amount is None else float(section_amount)
+    # 自動 EQ 曲線:把資料驅動的修正 EQ(各頻段增益 → biquad)+ 低切 串成綜合響應供 UI 畫
+    _eq_bands = [(_BAND_EQ[b][0], _BAND_EQ[b][1], corrections["eq_band_gains_db"].get(b, 0.0), _BAND_EQ[b][2])
+                 for b, _, _ in _BANDS]
+    corrections["eq_curve"] = _eq_response_curve(_eq_bands, asr, corrections.get("low_cut_hz", 0.0))
 
     # ── 繪圖:頻譜曲線(before / target / 預測 after)──────
     fmax = min(20000.0, asr / 2.0 - 1.0)
@@ -1490,6 +1523,22 @@ def _multiband_manual(data: "np.ndarray", sr: int, crossovers: list, bands: list
             logger.warning("手動多頻段 %s 失敗(原樣通過)", label, exc_info=True)
             out += band
     return out, {"active": any_active, "crossovers": xs, "meter_hz": _METER_HZ, "bands": bands_meter}
+
+
+def _sibilant_band(data: "np.ndarray", sr: int,
+                   default: tuple = (5000.0, 9000.0)) -> tuple[float, float]:
+    """偵測『實際齒音峰值頻率』(4.5–11kHz 內能量最集中處)→ 以它為中心的 de-ess 頻帶。
+    讓去齒音跟著真正的 ess/sh 位置走(每個歌手/麥克風不同),而非套死 5–9kHz。"""
+    try:
+        mono = np.mean(data, axis=1)
+        f, pxx = _welch_psd(mono, sr)
+        m = (f >= 4500.0) & (f <= 11000.0)
+        if not np.any(m):
+            return default
+        fpk = float(f[m][int(np.argmax(pxx[m]))])
+        return (max(3800.0, fpk * 0.78), min(sr / 2.0 * 0.95, fpk * 1.32))
+    except Exception:
+        return default
 
 
 def _deesser(data: "np.ndarray", sr: int, *, f_lo: float = 5000.0, f_hi: float = 9000.0,
@@ -2156,7 +2205,12 @@ def master(
     if deess_amount > 1e-3:
         _emit(progress, 38.0, "齒音消除 · De-essing")
         try:
-            data, meters["deess"] = _deesser(data, sr, amount=deess_amount)
+            # auto 模式:跟著偵測到的齒音峰值頻率走(更完整);手動維持預設帶以可預期
+            if auto and (de_ess is None) and (de_ess_amount is None):
+                d_lo, d_hi = _sibilant_band(data, sr)
+            else:
+                d_lo, d_hi = 5000.0, 9000.0
+            data, meters["deess"] = _deesser(data, sr, f_lo=d_lo, f_hi=d_hi, amount=deess_amount)
             stages.append("de_ess")
         except Exception:
             logger.warning("de-ess 失敗(略過,不影響輸出)", exc_info=True)
