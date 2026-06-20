@@ -1327,6 +1327,90 @@ def _goniometer(data: "np.ndarray", sr: int) -> dict:
     return {"points": pts, "correlation": corr, "width_index": width, "bands": band_out}
 
 
+# =========================================================================== #
+# 動態 EQ(Dynamic EQ)—— 頻率選擇性的動態處理:某頻段只在它「突出」(超過門檻)
+# 時才修,平常不動。比靜態 EQ 透明 —— 用來馴服間歇性的刺耳/共振/轟。
+# 做法:抽出該頻段(bandpass),用偵測器算逐樣本增益,out = data + (g-1)*band。
+# =========================================================================== #
+def _bandpass_sos(sr: int, f0: float, q: float) -> "np.ndarray":
+    """中心 f0、頻寬由 Q 決定的 2 階 Butterworth 帶通(通帶單位增益)。"""
+    bw = max(10.0, float(f0) / max(float(q), 0.3))
+    lo = max(20.0, f0 - bw / 2.0)
+    hi = min(sr / 2.0 - 1.0, f0 + bw / 2.0)
+    if hi <= lo:
+        hi = min(sr / 2.0 - 1.0, lo * 1.25)
+    return sps.butter(2, [lo / (sr / 2.0), hi / (sr / 2.0)], btype="band", output="sos")
+
+
+def _dynamic_eq_band(data: "np.ndarray", sr: int, *, f0: float, q: float = 2.0,
+                     thresh_db: float = -30.0, ratio: float = 3.0, attack_ms: float = 5.0,
+                     release_ms: float = 120.0, max_db: float = 6.0, mode: str = "cut") -> tuple["np.ndarray", dict]:
+    """單一動態 EQ 頻段。mode='cut'(超門檻→衰減,馴服共振/刺耳)或 'boost'(低於門檻→增益)。
+    回 (音訊, meter)。逐樣本增益向量化平滑(同壓縮器 ballistics)。"""
+    try:
+        sos = _bandpass_sos(sr, f0, q)
+        band = np.empty_like(data)
+        for ch in range(data.shape[1]):
+            band[:, ch] = sps.sosfilt(sos, data[:, ch])
+        det = np.sqrt(np.mean(band ** 2, axis=1) + 1e-12)  # 該頻段的能量偵測
+        level_db = 20.0 * np.log10(det + 1e-9)
+        if mode == "boost":
+            under = np.maximum(0.0, thresh_db - level_db)
+            tgt_db = np.clip(under * (1.0 - 1.0 / max(ratio, 1.0)), 0.0, float(max_db))
+        else:
+            over = np.maximum(0.0, level_db - thresh_db)
+            tgt_db = -np.clip(over * (1.0 - 1.0 / max(ratio, 1.0)), 0.0, float(max_db))
+        tau = max(1.0, (attack_ms + release_ms) / 2.0)
+        a = float(np.exp(-1.0 / (sr * tau / 1000.0)))
+        sm = sps.lfilter([1 - a], [1, -a], tgt_db)
+        g = 10 ** (sm / 20.0)
+        out = data + (g[:, None] - 1.0) * band  # = (data - band) + g*band
+        env = _downsample_env_db(np.minimum(1.0, g), sr) if mode == "cut" else []
+        peak_db = round(float(np.max(np.abs(sm))) if sm.size else 0.0, 2)
+        return out, {"f0": round(float(f0), 0), "q": round(float(q), 2), "mode": mode,
+                     "gr_db": env, "max_db": peak_db, "active": peak_db > 0.1}
+    except Exception:
+        logger.warning("動態 EQ band 失敗(略過,不影響輸出)", exc_info=True)
+        return data, {"f0": round(float(f0), 0), "mode": mode, "active": False}
+
+
+# 自動動態 EQ:依偵測到的音色問題放置頻段,只馴服突出的部分(de-ess 另外處理齒音)
+_DYN_TARGETS = {
+    "harsh": (3500.0, 2.0),       # 2–5kHz 刺耳
+    "muddy": (250.0, 1.6),        # 200–400Hz 糊
+    "boomy_low": (90.0, 1.3),     # 低頻轟
+}
+
+
+def _auto_dynamic_eq(data: "np.ndarray", sr: int, analysis_before: Optional[dict],
+                     strength: float) -> tuple["np.ndarray", list]:
+    """auto 模式:對偵測到的 harsh/muddy/boomy 放動態 EQ,只在該頻段超過自身平均時才修。"""
+    if not analysis_before:
+        return data, []
+    pids = {p.get("id"): p for p in analysis_before.get("problems", [])}
+    trust = float(np.clip(strength, 0.2, 1.0))
+    sev_map = {"low": 0.5, "medium": 0.8, "high": 1.2}
+    meters: list = []
+    for name, (f0, q) in _DYN_TARGETS.items():
+        if name not in pids:
+            continue
+        sev = sev_map.get(pids[name].get("severity"), 0.5)
+        # 門檻 = 該頻段自身 RMS + 2dB → 只作用在「比平常大聲」的瞬間(透明)
+        try:
+            bmono = sps.sosfilt(_bandpass_sos(sr, f0, q), np.mean(data, axis=1))
+            brms_db = 20.0 * np.log10(float(np.sqrt(np.mean(bmono ** 2) + 1e-12)) + 1e-9)
+        except Exception:
+            brms_db = -30.0
+        data, m = _dynamic_eq_band(
+            data, sr, f0=f0, q=q, thresh_db=brms_db + 2.0,
+            ratio=2.0 + 2.0 * trust, attack_ms=4.0, release_ms=120.0,
+            max_db=round(2.5 + 3.5 * sev * trust, 1), mode="cut")
+        m["target"] = name
+        if m.get("active"):
+            meters.append(m)
+    return data, meters
+
+
 # --------------------------------------------------------------------------- #
 # 主流程
 # --------------------------------------------------------------------------- #
@@ -1349,6 +1433,7 @@ def master(
     multiband: Optional[bool] = None,
     saturation: float = 0.0,
     residual_eq: Optional[bool] = None,
+    dynamic_eq: Optional[list] = None,
     matched_output_path: Optional[str] = None,
     analyze_result: bool = True,
     progress: Optional[ProgressFn] = None,
@@ -1420,6 +1505,29 @@ def master(
     meters: dict = {}
     trust = float(np.clip(auto_strength, 0.2, 1.0))
     stages = ["load", "reference_match" if ref_used else ("corrective_eq" if (auto and corr) else "genre_eq")]
+
+    # 1c) 動態 EQ:只在某頻段「突出」時才修(透明)。手動 dynamic_eq 清單 > auto 依問題放置。
+    deq_meters: list = []
+    if dynamic_eq:
+        _emit(progress, 30.0, "動態 EQ · Dynamic EQ")
+        for bd in dynamic_eq:
+            if not isinstance(bd, dict) or not bd.get("enabled", True):
+                continue
+            try:
+                data, m = _dynamic_eq_band(
+                    data, sr, f0=float(bd.get("freq", 1000.0)), q=float(bd.get("q", 2.0) or 2.0),
+                    thresh_db=float(bd.get("threshold", -30.0)), ratio=float(bd.get("ratio", 3.0) or 3.0),
+                    attack_ms=float(bd.get("attack", 5.0) or 5.0), release_ms=float(bd.get("release", 120.0) or 120.0),
+                    max_db=float(bd.get("maxDb", 6.0) or 6.0), mode=str(bd.get("mode", "cut")))
+                deq_meters.append(m)
+            except Exception:
+                logger.warning("動態 EQ 手動頻段失敗(略過)", exc_info=True)
+    elif auto and analysis_before:
+        data, deq_meters = _auto_dynamic_eq(data, sr, analysis_before, auto_strength)
+    if deq_meters:
+        _emit(progress, 32.0, "動態 EQ · Dynamic EQ")
+        meters["dynamic_eq"] = deq_meters
+        stages.append("dynamic_eq")
 
     # 2) 齒音消除(de-ess):auto 由偵測到的 'sibilant' 問題驅動;手動由 de_ess/de_ess_amount
     deess_amount = 0.0
@@ -1591,6 +1699,7 @@ def master(
         "chain": {
             "stages": stages,
             "deEss": round(deess_amount, 3),
+            "dynamicEq": len(deq_meters),
             "multiband": "multiband" in meters,
             "saturation": round(sat_amount, 3),
             "residualEq": bool(do_residual),

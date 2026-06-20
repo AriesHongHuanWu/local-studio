@@ -38,7 +38,8 @@ export function GainReduction({ meters }: Props) {
   const t = useT();
   const mb = meters.multiband;
   const de = meters.deess;
-  if (!mb?.active && !de?.active) return null;
+  const deq = (meters.dynamic_eq ?? []).filter((d) => d.active && d.gr_db && d.gr_db.length);
+  if (!mb?.active && !de?.active && deq.length === 0) return null;
 
   return (
     <div className="al-gr">
@@ -52,6 +53,10 @@ export function GainReduction({ meters }: Props) {
       {de?.active && de.gr_db && (
         <GrStrip name={t('master.gr.deess')} gr={de.gr_db} max={-(de.max_reduction_db ?? 0)} />
       )}
+      {deq.map((d, i) => (
+        <GrStrip key={`deq${i}`} name={`${t('master.gr.dyneq')} ${Math.round(d.f0)}Hz`}
+                 gr={d.gr_db ?? []} max={-(d.max_db ?? 0)} />
+      ))}
     </div>
   );
 }

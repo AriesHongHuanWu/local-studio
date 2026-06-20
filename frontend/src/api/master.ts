@@ -131,6 +131,15 @@ export interface MasterMeters {
   };
   saturation?: { amount: number };
   residual_eq?: { applied_db: Record<string, number>; max_db: number; strength: number };
+  dynamic_eq?: {
+    f0: number;
+    q?: number;
+    mode: string;
+    gr_db?: number[];
+    max_db: number;
+    active: boolean;
+    target?: string;
+  }[];
 }
 export interface GoniometerData {
   points: [number, number][];
@@ -141,6 +150,7 @@ export interface GoniometerData {
 export interface ChainState {
   stages: string[];
   deEss: number;
+  dynamicEq?: number;
   multiband: boolean;
   saturation: number;
   residualEq: boolean;

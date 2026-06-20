@@ -14,6 +14,7 @@ interface Props {
 // Canonical display order + the i18n label key + how to detect "active".
 const STAGES: { id: string; key: string; match: (s: string[]) => boolean }[] = [
   { id: 'eq', key: 'master.chain.eq', match: (s) => s.includes('corrective_eq') || s.includes('genre_eq') || s.includes('reference_match') },
+  { id: 'dyneq', key: 'master.chain.dyneq', match: (s) => s.includes('dynamic_eq') },
   { id: 'deess', key: 'master.chain.deess', match: (s) => s.includes('de_ess') },
   { id: 'multiband', key: 'master.chain.multiband', match: (s) => s.includes('multiband') || s.includes('compress') },
   { id: 'dynamics', key: 'master.chain.dynamics', match: (s) => s.includes('macro_dynamics') },
