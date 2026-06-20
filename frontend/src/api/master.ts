@@ -116,10 +116,12 @@ export interface BandGR {
 export interface MasterMeters {
   multiband?: {
     active: boolean;
-    f_lo: number;
-    f_hi: number;
+    f_lo?: number;
+    f_hi?: number;
+    crossovers?: number[];
     meter_hz: number;
-    bands: { low?: BandGR; mid?: BandGR; high?: BandGR };
+    // Auto mode keys by low/mid/high; manual multiband keys by freq-range label.
+    bands: Record<string, BandGR | undefined>;
   };
   deess?: {
     active: boolean;
@@ -227,6 +229,8 @@ export interface MasterAdvanced {
   paramEq?: string;
   /** Adaptive EQ (automation): time-varying corrective EQ that rides the song. */
   adaptiveEq?: boolean;
+  /** Pro mode: JSON-stringified manual multiband {crossovers, bands}. */
+  multibandManual?: string;
 }
 
 /** POST /api/master — spawn the background mastering job. */
@@ -265,6 +269,7 @@ export async function createMasterJob(
     if (a.residualEq !== undefined) form.append('residualEq', String(a.residualEq));
     if (a.paramEq) form.append('paramEq', a.paramEq);
     if (a.adaptiveEq) form.append('adaptiveEq', 'true');
+    if (a.multibandManual) form.append('multibandManual', a.multibandManual);
   }
 
   let res: Response;

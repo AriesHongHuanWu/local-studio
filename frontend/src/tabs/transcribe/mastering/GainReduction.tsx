@@ -41,14 +41,14 @@ export function GainReduction({ meters }: Props) {
   const deq = (meters.dynamic_eq ?? []).filter((d) => d.active && d.gr_db && d.gr_db.length);
   if (!mb?.active && !de?.active && deq.length === 0) return null;
 
+  // Named auto bands (low/mid/high) get i18n labels; manual bands use their freq-range key.
+  const bandLabel = (key: string) =>
+    key === 'low' || key === 'mid' || key === 'high' ? t(`master.gr.${key}`) : `${key} Hz`;
+
   return (
     <div className="al-gr">
-      {mb?.active && (
-        <>
-          {mb.bands.low && <GrStrip name={t('master.gr.low')} gr={mb.bands.low.gr_db} max={mb.bands.low.max_gr_db} />}
-          {mb.bands.mid && <GrStrip name={t('master.gr.mid')} gr={mb.bands.mid.gr_db} max={mb.bands.mid.max_gr_db} />}
-          {mb.bands.high && <GrStrip name={t('master.gr.high')} gr={mb.bands.high.gr_db} max={mb.bands.high.max_gr_db} />}
-        </>
+      {mb?.active && Object.entries(mb.bands).map(([key, b]) =>
+        b ? <GrStrip key={key} name={bandLabel(key)} gr={b.gr_db} max={b.max_gr_db} /> : null,
       )}
       {de?.active && de.gr_db && (
         <GrStrip name={t('master.gr.deess')} gr={de.gr_db} max={-(de.max_reduction_db ?? 0)} />

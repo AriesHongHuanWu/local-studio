@@ -308,6 +308,42 @@
   line-height: 1.5;
   color: var(--al-ink-faint);
 }
+.al-master__switch--mt { margin-top: var(--al-space-3); }
+
+/* Manual multiband compressor (Pro) */
+.al-mb { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.al-mb__head { display: flex; align-items: center; justify-content: space-between; }
+.al-mb__count { font-family: var(--al-font-mono); font-size: var(--al-text-xs); color: var(--al-ink-faint); }
+.al-mb__add {
+  font-size: var(--al-text-xs); padding: 3px 10px; border-radius: 999px;
+  border: 1px solid var(--al-hairline); background: var(--al-surface); color: var(--al-ink); cursor: pointer;
+}
+.al-mb__add:disabled { opacity: 0.4; cursor: not-allowed; }
+.al-mb__band {
+  border: 1px solid var(--al-hairline); border-radius: var(--al-radius-panel);
+  padding: 10px 12px; background: var(--al-surface-2, var(--al-surface));
+}
+.al-mb__band--off { opacity: 0.55; }
+.al-mb__bandhead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.al-mb__range { font-family: var(--al-font-mono); font-size: var(--al-text-sm); font-weight: 600; color: var(--al-ink); }
+.al-mb__bandtools { display: flex; align-items: center; gap: 6px; }
+.al-mb__chip {
+  font-size: 11px; padding: 2px 8px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--al-hairline); background: transparent; color: var(--al-ink-faint);
+}
+.al-mb__chip--on { background: var(--al-accent); border-color: var(--al-accent); color: #fff; }
+.al-mb__rm {
+  width: 20px; height: 20px; line-height: 1; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--al-hairline); background: transparent; color: var(--al-ink-faint);
+}
+.al-mb__knobs { display: grid; grid-template-columns: repeat(auto-fit, minmax(86px, 1fr)); gap: 8px 12px; }
+.al-mb__knob { display: flex; flex-direction: column; gap: 2px; }
+.al-mb__knoblabel { font-size: 11px; color: var(--al-ink-faint); }
+.al-mb__knobrange { width: 100%; accent-color: var(--al-accent); }
+.al-mb__knobval { font-family: var(--al-font-mono); font-size: 11px; color: var(--al-ink); }
+.al-mb__cross { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 11px; color: var(--al-ink-faint); }
+.al-mb__crossrange { flex: 1; accent-color: var(--al-accent); }
+.al-mb__crossval { font-family: var(--al-font-mono); color: var(--al-ink); min-width: 56px; text-align: right; }
 .al-master__slider {
   display: grid;
   grid-template-columns: 6.5em 1fr 4.5em;

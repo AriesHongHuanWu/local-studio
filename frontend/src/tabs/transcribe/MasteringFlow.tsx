@@ -19,6 +19,7 @@ import { createMasterJob, getMasterJob, masterResultUrl, masterMatchedUrl, match
 import { ABCompare } from './mastering/ABCompare';
 import { ParametricEQ, newBand } from './mastering/ParametricEQ';
 import { toBackendBands } from './mastering/eqMath';
+import { MultibandPanel, defaultMultiband, toBackendMultiband, type MbBand } from './mastering/MultibandPanel';
 import type { EqBand } from './mastering/eqMath';
 import { saveBinaryUrl } from '../export/saveFile';
 import type { MasterLoudness, MasterMeta, MasterAnalysis } from '../../api/master';
@@ -64,6 +65,9 @@ export function MasteringFlow() {
   const [proMode, setProMode] = useState(false);
   const [paramBands, setParamBands] = useState<EqBand[]>([]);
   const [adaptiveEq, setAdaptiveEq] = useState(false);
+  const [mbEnabled, setMbEnabled] = useState(false);
+  const [mbCrossovers, setMbCrossovers] = useState<number[]>(() => defaultMultiband().crossovers);
+  const [mbBands, setMbBands] = useState<MbBand[]>(() => defaultMultiband().bands);
 
   // Section macro-dynamics (−1 balance ↔ +1 punch) + advanced manual params.
   const [dynamics, setDynamics] = useState(0);
@@ -234,6 +238,7 @@ export function MasteringFlow() {
           autoStrength,
           paramEq: proMode && paramBands.some((b) => b.enabled) ? JSON.stringify(toBackendBands(paramBands)) : undefined,
           adaptiveEq: adaptiveEq || undefined,
+          multibandManual: proMode && mbEnabled ? toBackendMultiband(mbCrossovers, mbBands) : undefined,
         });
         if (stoppedRef.current) return;
         pollTimer.current = setTimeout(() => void poll(jobId), POLL_MS);
@@ -245,7 +250,7 @@ export function MasteringFlow() {
         setPhase('error');
       }
     })();
-  }, [file, genre, loudness, reference, dynamics, width, eqBass, eqLowMid, eqPresence, eqAir, compScale, ceiling, autoStrength, proMode, paramBands, poll, t]);
+  }, [file, genre, loudness, reference, dynamics, width, eqBass, eqLowMid, eqPresence, eqAir, compScale, ceiling, autoStrength, proMode, paramBands, adaptiveEq, mbEnabled, mbCrossovers, mbBands, poll, t]);
 
   // Three-way A/B/C: upload an external master → loudness-match it to OUR
   // master's output LUFS → add as the C source for an original/ours/theirs shoot-out.
@@ -519,6 +524,29 @@ export function MasteringFlow() {
               </span>
             </label>
             <ParametricEQ bands={paramBands} onChange={setParamBands} />
+
+            <label className="al-master__switch al-master__switch--mt">
+              <input
+                type="checkbox"
+                checked={mbEnabled}
+                onChange={(e) => setMbEnabled(e.target.checked)}
+                disabled={running}
+              />
+              <span className="al-master__switchbody">
+                <span className="al-master__switchtitle">
+                  <SlidersHorizontal size={14} /> {t('master.mb.toggle')}
+                </span>
+                <span className="al-master__switchhint">{t('master.mb.hint')}</span>
+              </span>
+            </label>
+            {mbEnabled && (
+              <MultibandPanel
+                crossovers={mbCrossovers}
+                bands={mbBands}
+                onChange={(c, b) => { setMbCrossovers(c); setMbBands(b); }}
+                disabled={running}
+              />
+            )}
           </div>
         )}
       </section>

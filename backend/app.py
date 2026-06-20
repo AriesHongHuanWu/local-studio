@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import os
 import shutil
 import sys
@@ -1809,6 +1810,50 @@ def _parse_param_eq(raw: Optional[str]) -> Optional[list]:
     return None
 
 
+def _mb_finite(x: object, default: float, lo: float, hi: float) -> float:
+    """Coerce one numeric band param: finite + clamped to its UI domain (NaN/Inf → default).
+    This is the single defensive layer for the local API — a non-finite value would otherwise
+    propagate through the IIR chain and silently zero the whole master."""
+    try:
+        v = float(x)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return default
+    if not math.isfinite(v):
+        return default
+    return float(min(max(v, lo), hi))
+
+
+def _parse_multiband(raw: Optional[str]) -> Optional[dict]:
+    """Parse the multibandManual JSON form field → sanitized {crossovers:[...], bands:[{...}]} or None.
+    Every numeric field is finite-coerced + clamped to its UI domain so a malformed payload can never
+    produce a silent/corrupt master. Caps at 6 bands / 5 crossovers; parse error degrades to None."""
+    if not raw:
+        return None
+    try:
+        obj = json.loads(raw)
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(obj, dict):
+        return None
+    raw_bands = [b for b in obj.get("bands", []) if isinstance(b, dict)][:6]
+    if not raw_bands:
+        return None
+    bands = [{
+        "threshold": _mb_finite(b.get("threshold"), -24.0, -60.0, 0.0),
+        "ratio": _mb_finite(b.get("ratio"), 2.0, 1.0, 20.0),
+        "attack": _mb_finite(b.get("attack"), 15.0, 0.5, 200.0),
+        "release": _mb_finite(b.get("release"), 120.0, 5.0, 2000.0),
+        "knee": _mb_finite(b.get("knee"), 6.0, 0.0, 24.0),
+        "makeup": _mb_finite(b.get("makeup"), 0.0, -12.0, 12.0),
+        "width": _mb_finite(b.get("width"), 1.0, 0.0, 2.0),
+        "ms": bool(b.get("ms", False)),
+        "bypass": bool(b.get("bypass", False)),
+    } for b in raw_bands]
+    xs = [c for c in obj.get("crossovers", []) if isinstance(c, (int, float)) and math.isfinite(c)]
+    crossovers = sorted({round(_mb_finite(c, 1000.0, 20.0, 21000.0), 1) for c in xs})[:5]
+    return {"crossovers": crossovers, "bands": bands}
+
+
 def _require_mastering() -> None:
     if not _mastering_available():
         raise HTTPException(
@@ -1867,6 +1912,7 @@ def _run_master_job(
             de_ess=opts.get("de_ess"),
             de_ess_amount=opts.get("de_ess_amount"),
             multiband=opts.get("multiband"),
+            multiband_manual=opts.get("multiband_manual"),
             saturation=opts.get("saturation", 0.0),
             residual_eq=opts.get("residual_eq"),
             param_eq=opts.get("param_eq"),
@@ -1924,6 +1970,7 @@ async def api_master(
     residualEq: Optional[bool] = Form(None),
     paramEq: Optional[str] = Form(None),
     adaptiveEq: Optional[bool] = Form(None),
+    multibandManual: Optional[str] = Form(None),
 ) -> JSONResponse:
     """建立母帶工作。multipart:audio=混音檔,genre,loudness,選用 reference=參考曲,
     以及選用的進階參數(width/dynamics/eq*/compScale/ceiling)。
@@ -1959,6 +2006,7 @@ async def api_master(
         "residual_eq": bool(residualEq) if residualEq is not None else None,
         "param_eq": _parse_param_eq(paramEq),
         "adaptive_eq": bool(adaptiveEq) if adaptiveEq is not None else None,
+        "multiband_manual": _parse_multiband(multibandManual),
     }
 
     valid_genres = [g["key"] for g in mastering.genres()] if mastering is not None else ["auto"]  # type: ignore[union-attr]

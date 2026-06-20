@@ -1263,6 +1263,170 @@ def _multiband_compress(data: "np.ndarray", sr: int, *, amount: float = 1.0,
     return out, {"active": True, "f_lo": f_lo, "f_hi": f_hi, "meter_hz": _METER_HZ, "bands": bands_meter}
 
 
+# =========================================================================== #
+# 手動多頻段壓縮(Pro)—— 自訂分頻點 → N 段,每段獨立 threshold/ratio/attack/release/
+# knee/makeup + 每段 M/S 路由(中/側分別壓)+ 每段立體聲寬度。相位一致 LR4 分頻,
+# 真實雙時間常數(attack≠release)用「控制速率」迴圈做(向量化拿不到狀態相依係數)。
+# =========================================================================== #
+def _lr4_split_n(data: "np.ndarray", sr: int, crossovers: list) -> list:
+    """以一串分頻點切成 N+1 段『真正的 LR4 帶通』(同 _lr4_split3 的串接法:每段 = 對上一段
+    高頻殘量做 LR4 高通 → 再 LR4 低通)。各段有 24 dB/oct 真實裙邊 → 頻段隔離乾淨(kick 不會
+    漏進中/高頻去誤觸該段壓縮器)。各段相加為 allpass(量值平坦、相位一致)= 多頻段業界標準。"""
+    xs = sorted(float(c) for c in crossovers if 20.0 < float(c) < sr / 2.0 - 50.0)
+    parts: list = []
+    remaining = data
+    for c in xs:
+        lp = _lr4_sos(sr, c, "low")
+        hp = _lr4_sos(sr, c, "high")
+        low = np.empty_like(remaining)
+        high = np.empty_like(remaining)
+        for ch in range(data.shape[1]):
+            low[:, ch] = sps.sosfilt(lp, remaining[:, ch])
+            high[:, ch] = sps.sosfilt(hp, remaining[:, ch])
+        parts.append(low)
+        remaining = high  # 只把「真實高通」往下一段切 → 每段都是乾淨帶通
+    parts.append(remaining)
+    return parts  # len == len(xs) + 1
+
+
+def _comp_gr_db(level_db: "np.ndarray", thresh_db: float, ratio: float, knee_db: float) -> "np.ndarray":
+    """軟膝壓縮靜態增益曲線 → 逐樣本增益衰減 dB(<=0)。膝區用二次曲線平滑過渡。"""
+    slope = (1.0 / max(float(ratio), 1.0)) - 1.0  # <= 0
+    over = level_db - float(thresh_db)
+    knee = max(0.0, float(knee_db))
+    if knee > 1e-6:
+        gr = np.zeros_like(level_db)
+        above = over >= knee / 2.0
+        ink = (over > -knee / 2.0) & (~above)
+        gr[above] = slope * over[above]
+        gr[ink] = slope * (over[ink] + knee / 2.0) ** 2 / (2.0 * knee)
+        return gr
+    return np.minimum(0.0, slope * over)
+
+
+_COMP_CTRL_DS = 32  # 壓縮器控制速率降採樣(sr/32 ≈ 1.4kHz):偵測/曲線/ballistics 都在此速率
+                    # (母帶 attack/release 多在 5–300ms,此解析度足夠,且把 Python 迴圈減半)
+
+
+def _comp_envelope(detect: "np.ndarray", sr: int, *, thresh_db: float, ratio: float, attack_ms: float,
+                   release_ms: float, knee_db: float, makeup_db: float
+                   ) -> tuple["np.ndarray", "np.ndarray", float]:
+    """從偵測訊號 detect (n, ch) 算出『逐樣本線性增益(含 makeup)』+ GR_dB 控制速率包絡 + ctrl_rate。
+    整條包絡在『控制速率』算(偵測、軟膝曲線、attack/release),只有最後上採樣走全速率 → 快。"""
+    n = detect.shape[0]
+    ds = max(1, int(_COMP_CTRL_DS))
+    sq = np.einsum("ij,ij->i", detect, detect) / detect.shape[1]  # 逐樣本功率
+    nb = n // ds
+    if nb < 2:  # 極短 → 全速率退化
+        level_db = 10.0 * np.log10(sq + 1e-12)
+        gr = _comp_gr_db(level_db, thresh_db, ratio, knee_db)
+        tau = max(1.0, (float(attack_ms) + float(release_ms)) / 2.0)
+        a = float(np.exp(-1.0 / (sr * tau / 1000.0)))
+        gr_sm = sps.lfilter([1 - a], [1, -a], gr)
+        return 10 ** ((gr_sm + float(makeup_db)) / 20.0), gr_sm, float(sr)
+    blk = sq[:nb * ds].reshape(nb, ds).mean(axis=1)            # 控制速率 RMS 偵測(每塊平均功率)
+    level_db = 10.0 * np.log10(blk + 1e-12)                    # 10log10(功率)= 振幅 dBFS
+    gr = _comp_gr_db(level_db, thresh_db, ratio, knee_db)      # 控制速率軟膝曲線(<=0)
+    cr = sr / ds
+    aa = float(np.exp(-1.0 / max(1.0, cr * float(attack_ms) / 1000.0)))
+    ar = float(np.exp(-1.0 / max(1.0, cr * float(release_ms) / 1000.0)))
+    ctrl = np.empty(nb)
+    g = 0.0
+    for i in range(nb):                                        # 狀態相依雙時間常數(控制速率,輕量)
+        t = float(gr[i])
+        coef = aa if t < g else ar                            # 更多衰減→attack;放開→release
+        g = coef * g + (1.0 - coef) * t
+        ctrl[i] = g
+    xp = np.arange(nb) * ds + ds / 2.0
+    out_gain = np.interp(np.arange(n), xp, 10 ** ((ctrl + float(makeup_db)) / 20.0))
+    return out_gain, ctrl, cr
+
+
+def _comp_apply(arr: "np.ndarray", sr: int, **p) -> tuple["np.ndarray", "np.ndarray", float]:
+    """壓一個 (n, ch) 區塊(立體聲鏈接:偵測自己、套自己)。回 (壓後音訊, GR_dB 包絡, ctrl_rate)。"""
+    out_gain, gr_db, cr = _comp_envelope(arr, sr, **p)
+    return arr * out_gain[:, None], gr_db, cr
+
+
+def _env_db_meter(gr_db: "np.ndarray", ctrl_rate: float, meter_hz: float = _METER_HZ) -> list:
+    """控制速率 GR(dB,<=0)→ ~meter_hz 包絡(每塊取最壞 GR),供 GainReduction UI。"""
+    if gr_db.size == 0:
+        return []
+    blk = max(1, int(ctrl_rate / max(meter_hz, 1.0)))
+    nb = gr_db.shape[0] // blk
+    env = gr_db[:nb * blk].reshape(nb, blk).min(axis=1) if nb >= 1 else gr_db
+    if env.shape[0] > _GR_MAX_POINTS:
+        env = env[::int(np.ceil(env.shape[0] / _GR_MAX_POINTS))]
+    return [round(float(v), 2) for v in env]
+
+
+def _apply_width(band: "np.ndarray", width: float) -> "np.ndarray":
+    """單一頻段的立體聲寬度(M/S:側訊號 × width)。width=1 不變,0=單聲道,>1 變寬。"""
+    if band.shape[1] < 2 or abs(float(width) - 1.0) < 1e-3:
+        return band
+    m = 0.5 * (band[:, 0] + band[:, 1])
+    s = 0.5 * (band[:, 0] - band[:, 1]) * float(width)
+    out = np.empty_like(band)  # 就地填(避開 column_stack 的額外配置)
+    out[:, 0] = m + s
+    out[:, 1] = m - s
+    return out
+
+
+def _multiband_manual(data: "np.ndarray", sr: int, crossovers: list, bands: list) -> tuple["np.ndarray", dict]:
+    """手動 N 段多頻段:每段獨立壓縮 + M/S + 寬度。回 (音訊, meter:各段 GR 包絡 + 摘要)。"""
+    # 全段 bypass/空 → 直接原樣回傳(真正透明 + 省掉分頻運算)
+    if not bands or all((b is None or b.get("bypass")) for b in bands):
+        return data, {"active": False, "crossovers": [], "meter_hz": _METER_HZ, "bands": {}}
+    parts = _lr4_split_n(data, sr, crossovers)
+    if len(parts) != len(bands):  # 對不齊 → 安全降級(以較短者為準,多的段落原樣通過)
+        logger.warning("手動多頻段:段數(%d)與參數(%d)不符,對齊處理", len(parts), len(bands))
+    xs = sorted(float(c) for c in crossovers if 20.0 < float(c) < sr / 2.0 - 50.0)
+    edges = [20.0, *xs, sr / 2.0]
+    out = np.zeros_like(data)
+    bands_meter: dict[str, dict] = {}
+    any_active = False
+    for i, band in enumerate(parts):
+        bp = bands[i] if i < len(bands) else None
+        lo = edges[i] if i < len(edges) - 1 else edges[-2]
+        hi = edges[i + 1] if i + 1 < len(edges) else edges[-1]
+        label = f"{lo:.0f}–{hi:.0f}"
+        if bp is None or bp.get("bypass"):
+            out += band
+            continue
+        p = dict(thresh_db=float(bp.get("threshold", -24.0)), ratio=float(bp.get("ratio", 2.0) or 1.0),
+                 attack_ms=float(bp.get("attack", 15.0) or 1.0), release_ms=float(bp.get("release", 120.0) or 1.0),
+                 knee_db=float(bp.get("knee", 6.0)), makeup_db=float(bp.get("makeup", 0.0)))
+        wv = bp.get("width", 1.0)
+        width = float(wv) if wv is not None else 1.0  # 不可用 `or 1.0`:width=0(單聲道)是合法值
+        ms = bool(bp.get("ms", False))
+        try:
+            if ms and band.shape[1] == 2:  # M/S 域:偵測 Mid 算『鏈接』增益 → 同樣套到 M 與 S
+                mid = 0.5 * (band[:, 0] + band[:, 1])
+                side = 0.5 * (band[:, 0] - band[:, 1])
+                gain, gr_db, cr = _comp_envelope(mid[:, None], sr, **p)  # 鏈接 → 壓縮時立體聲像穩定不抽吸
+                out_m = mid * gain
+                out_s = side * gain * width                              # 同一增益(穩定像)+ 寬度只動側
+                comp = np.empty_like(band)
+                comp[:, 0] = out_m + out_s
+                comp[:, 1] = out_m - out_s
+            else:
+                comp, gr_db, cr = _comp_apply(band, sr, **p)
+                comp = _apply_width(comp, width)
+            if not np.isfinite(comp).all():  # 防線:任一段壞掉不污染整體和(壞參數 → 原樣通過)
+                logger.warning("手動多頻段 %s 出現非有限值(原樣通過)", label)
+                out += band
+                continue
+            out += comp
+            env = _env_db_meter(gr_db, cr)
+            bands_meter[label] = {"gr_db": env, "max_gr_db": round(float(min(env)) if env else 0.0, 2),
+                                  "ms": ms, "width": round(width, 2)}
+            any_active = True
+        except Exception:
+            logger.warning("手動多頻段 %s 失敗(原樣通過)", label, exc_info=True)
+            out += band
+    return out, {"active": any_active, "crossovers": xs, "meter_hz": _METER_HZ, "bands": bands_meter}
+
+
 def _deesser(data: "np.ndarray", sr: int, *, f_lo: float = 5000.0, f_hi: float = 9000.0,
              thresh_db: float = -30.0, ratio: float = 4.0, max_reduction_db: float = 8.0,
              attack_ms: float = 1.0, release_ms: float = 60.0, amount: float = 1.0) -> tuple["np.ndarray", dict]:
@@ -1669,6 +1833,7 @@ def master(
     de_ess: Optional[bool] = None,
     de_ess_amount: Optional[float] = None,
     multiband: Optional[bool] = None,
+    multiband_manual: Optional[dict] = None,
     saturation: float = 0.0,
     residual_eq: Optional[bool] = None,
     dynamic_eq: Optional[list] = None,
@@ -1813,7 +1978,18 @@ def master(
     #    auto 偵測「已過度壓縮」(comp_amount=0)→ 完全不壓(尊重診斷)。
     _emit(progress, 48.0, "壓縮 · Compression")
     cs = max(0.0, float(comp_scale))
-    use_mb = bool(multiband) if multiband is not None else (auto and corr is not None)
+    mb_manual_used = bool(multiband_manual and multiband_manual.get("bands"))
+    if mb_manual_used:
+        # 手動多頻段(Pro):自訂分頻 + 每段 thr/ratio/atk/rel/knee/makeup + M/S + 寬度。優先於 auto。
+        _emit(progress, 49.0, "手動多頻段 · Manual multiband")
+        try:
+            data, meters["multiband"] = _multiband_manual(
+                data, sr, multiband_manual.get("crossovers", []), multiband_manual["bands"])
+            stages.append("multiband")
+        except Exception:
+            logger.warning("手動多頻段失敗(略過,改用一般壓縮)", exc_info=True)
+            mb_manual_used = False
+    use_mb = (not mb_manual_used) and (bool(multiband) if multiband is not None else (auto and corr is not None))
     if use_mb:
         if auto and corr:
             ca = float(corr.get("comp_amount", 0.0))
@@ -1826,7 +2002,7 @@ def master(
                 stages.append("multiband")
             except Exception:
                 logger.warning("多頻段壓縮失敗(略過,不影響輸出)", exc_info=True)
-    else:
+    elif not mb_manual_used:
         comp = dict(preset["comp"])
         if auto and corr:
             ca = float(corr.get("comp_amount", 0.0))
