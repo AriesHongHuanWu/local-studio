@@ -61,6 +61,11 @@ export const common: Record<string, Entry> = {
     zh: '音訊工具箱 — 一堆好用小工具:齒音分析、調性/BPM、響度標準化、降噪、格式轉換…',
     en: 'Audio Toolbox — handy tools: de-ess analyzer, key/BPM, loudness, denoise, format convert…',
   },
+  'common.mode.visualizer': { zh: '視覺化', en: 'Visualizer' },
+  'common.mode.visualizerTitle': {
+    zh: '視覺化 — 把歌做成會跟著音樂抖動的影片(多模板、片頭、可匯出發佈)',
+    en: 'Visualizer — turn a song into an audio-reactive video (templates, intro card, export)',
+  },
   'common.mode.download': { zh: '下載器', en: 'Downloader' },
   'common.mode.downloadTitle': {
     zh: '下載器 — 從 YouTube 等上千平台抓音訊/影片,可拖進 DAW、匯入字幕/歌詞,並深度分析調性/BPM/曲式/EQ/人聲混音',

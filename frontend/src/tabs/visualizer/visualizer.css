@@ -1,0 +1,50 @@
+/* Visualizer — audio-reactive canvas + controls. */
+
+.al-viz__drop { margin-top: 8px; }
+
+.al-viz__stage { display: flex; flex-direction: column; gap: 16px; }
+.al-viz__canvaswrap { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.al-viz__canvas {
+  display: block; max-width: 100%; max-height: 58vh; width: auto; height: auto; margin: 0 auto;
+  border-radius: var(--al-radius-panel); border: 1px solid var(--al-hairline);
+  background: #000; box-shadow: var(--al-shadow-panel, 0 6px 24px rgba(0,0,0,.4));
+}
+.al-viz__transport { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.al-viz__export { display: inline-flex; align-items: center; gap: 6px; }
+.al-viz__msg { font-size: var(--al-text-sm); color: var(--al-green, #5fc77e); }
+.al-viz__exphint { font-size: var(--al-text-xs); color: var(--al-ink-faint); margin: 0; }
+
+.al-viz__controls {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px;
+  border: 1px solid var(--al-hairline); border-radius: var(--al-radius-panel);
+  padding: var(--al-pad-panel); background: var(--al-surface);
+}
+.al-viz__group { display: flex; flex-direction: column; gap: 8px; }
+.al-viz__glabel {
+  font-family: var(--al-font-mono); font-size: var(--al-text-xs); text-transform: uppercase;
+  letter-spacing: var(--al-tracking-caps); color: var(--al-ink-faint);
+}
+.al-viz__tpls { display: flex; flex-wrap: wrap; gap: 6px; }
+.al-viz__tpl {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 6px 11px; border: 1px solid var(--al-hairline); border-radius: var(--al-radius-chip, 8px);
+  background: var(--al-surface-2); color: var(--al-ink-muted); cursor: pointer; font-size: var(--al-text-sm);
+}
+.al-viz__tpl.is-on { border-color: var(--al-gold); background: var(--al-gold-glow, rgba(216,166,87,.14)); color: var(--al-gold); }
+
+.al-viz__colors label, .al-viz__sliders label {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  font-size: var(--al-text-sm); color: var(--al-ink-muted);
+}
+.al-viz__colors input[type="color"] { width: 40px; height: 26px; border: 1px solid var(--al-hairline); border-radius: 6px; background: none; cursor: pointer; padding: 0; }
+.al-viz__sliders input[type="range"] { flex: 1; max-width: 150px; accent-color: var(--al-gold); }
+
+.al-viz__intro input[type="text"] {
+  padding: 7px 10px; border: 1px solid var(--al-hairline); border-radius: 7px;
+  background: var(--al-surface-2); color: var(--al-ink); font-size: var(--al-text-sm);
+}
+.al-viz__intro input[type="text"]:focus { outline: none; border-color: var(--al-gold); }
+.al-viz__introfade { display: flex; align-items: center; gap: 6px; font-size: var(--al-text-sm); color: var(--al-ink-muted); }
+.al-viz__introfade input { width: 56px; padding: 5px 8px; border: 1px solid var(--al-hairline); border-radius: 6px; background: var(--al-surface-2); color: var(--al-ink); }
+.al-viz__introtoggle { display: flex; align-items: center; gap: 7px; font-size: var(--al-text-sm); color: var(--al-ink-faint); cursor: pointer; }
+.al-viz__introtoggle input { accent-color: var(--al-gold); }

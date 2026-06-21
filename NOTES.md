@@ -1,16 +1,18 @@
-# Local Studio v0.1.41
+# Local Studio v0.1.42
 
-🗂️ **Catalog — your songs.** The start of the connective tissue that makes Local Studio one studio instead of scattered tools.
+📺✨ **Visualizer** — turn a song into an audio-reactive video you can publish.
 
-A new **Catalog** mode (top of the sidebar) is your home: a grid of **song projects**, each one gathering a song's artifacts in one place — the beat you downloaded, its analysis (key/BPM/genre), masters, processed vocals — instead of every job being a one-off you lose track of.
+A new **Visualizer** mode (under Video): drop a song and a canvas reacts to the music in real time.
 
-- In the **Downloader**, after you download/analyze a beat there's now an **"Add to project"** button — create a new song or add to an existing one. The project picks up the beat's key/BPM/genre as its headline.
-- Open a project to see its items, with **reveal-in-folder** and **drag-to-DAW** on each (desktop).
-- Everything is stored locally.
+- **4 high-quality templates** — Radial pulse orb, Spectrum bars, Waveform ribbon, Particle field — with glow/bloom.
+- **Beat-shake** — visuals jump on the kick; tune the amount.
+- **Intro card** — song title + artist (artist optional), with a **fade-out after N seconds** so it leaves just the visualizer.
+- **Customize** — background + two accent colors, **sensitivity**, **beat-shake**, **glow/trails**, and **aspect ratio** (16:9 / 9:16 vertical / 1:1 for socials).
+- **Export video** — records the canvas + audio to **MP4** (WebM fallback), saved to disk, ready to post.
 
-This is the first step of the project-centric workflow; more modes (Mastering, Vocal chain, Lyrics) will feed into projects, and the sidebar will reorganize around the production journey, in coming updates.
+Tip: master your track first, then visualize it — drop the mastered file in, pick **Radial pulse**, set your title/artist to fade after ~5s, tweak sensitivity, and **Export**.
 
-Everything from v0.1.40 is included (Compose tools, Vocal Chain, per-platform delivery + compliance).
+Everything from v0.1.41 is included (Catalog/projects, Compose tools, Vocal Chain, per-platform delivery).
 
 Support: ☕ [Ko-fi](https://ko-fi.com/arieswu) · [PayPal](https://paypal.me/Arieshonghuan) · [GitHub Sponsors](https://github.com/sponsors/AriesHongHuanWu).
 
