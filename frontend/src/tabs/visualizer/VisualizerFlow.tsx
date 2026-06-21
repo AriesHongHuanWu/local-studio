@@ -10,7 +10,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { UploadCloud, Play, Pause, Film, Loader2, Sparkles } from 'lucide-react';
 import { saveBinaryBlob } from '../export/saveFile';
 import { useLang } from '../../i18n';
-import { TEMPLATES, resetTemplateState, type VizParams } from './vizTemplates';
+import { TEMPLATES, resetTemplateState, applyEffects, type VizParams, type VizEffects } from './vizTemplates';
 import './visualizer.css';
 
 const ASPECTS: { key: string; label: string; w: number; h: number }[] = [
@@ -47,6 +47,7 @@ export function VisualizerFlow() {
     bg: '#0b0b12', accent: '#d8a657', accent2: '#7a5cff', sensitivity: 1, shake: 0.4, glow: 0.5,
   });
   const [intro, setIntro] = useState({ title: '', artist: '', fadeSec: 5, show: true });
+  const [fx, setFx] = useState<VizEffects>({ mirror: 'none', vignette: 0, grain: 0, flash: 0 });
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -114,6 +115,8 @@ export function VisualizerFlow() {
     try { tpl.draw({ ctx, w, h, freq, time, t, level, bass, beat, params }); } catch { /* keep going */ }
     ctx.restore();
 
+    try { applyEffects(ctx, w, h, beat, params.accent, fx); } catch { /* keep going */ }
+
     // intro card
     if (intro.show && intro.title && t < intro.fadeSec) {
       const fade = t > intro.fadeSec - 1 ? Math.max(0, intro.fadeSec - t) : 1;
@@ -132,7 +135,7 @@ export function VisualizerFlow() {
       ctx.globalAlpha = 1;
     }
     rafRef.current = requestAnimationFrame(renderFrame);
-  }, [aspectDef, params, tplKey, intro]);
+  }, [aspectDef, params, tplKey, intro, fx]);
 
   const play = useCallback(async () => {
     const audio = audioRef.current; if (!audio) return;
@@ -267,6 +270,21 @@ export function VisualizerFlow() {
               <label className="al-viz__introtoggle">
                 <input type="checkbox" checked={intro.show} onChange={(e) => setIntro((i) => ({ ...i, show: e.target.checked }))} /> {en ? 'Show intro' : '顯示片頭'}
               </label>
+            </div>
+
+            <div className="al-viz__group al-viz__sliders">
+              <span className="al-viz__glabel">{en ? 'Effects' : '特效'}</span>
+              <div className="al-viz__tpls">
+                {(['none', 'h', 'quad'] as const).map((m) => (
+                  <button key={m} type="button" className={`al-viz__tpl${fx.mirror === m ? ' is-on' : ''}`}
+                          onClick={() => setFx((p) => ({ ...p, mirror: m }))}>
+                    {m === 'none' ? (en ? 'No mirror' : '不鏡像') : m === 'h' ? (en ? 'Mirror' : '鏡像') : (en ? 'Kaleido' : '萬花筒')}
+                  </button>
+                ))}
+              </div>
+              <label>{en ? 'Vignette' : '暗角'} <input type="range" min={0} max={1} step={0.05} value={fx.vignette} onChange={(e) => setFx((p) => ({ ...p, vignette: Number(e.target.value) }))} /></label>
+              <label>{en ? 'Grain' : '顆粒'} <input type="range" min={0} max={1} step={0.05} value={fx.grain} onChange={(e) => setFx((p) => ({ ...p, grain: Number(e.target.value) }))} /></label>
+              <label>{en ? 'Beat flash' : '節拍閃光'} <input type="range" min={0} max={1} step={0.05} value={fx.flash} onChange={(e) => setFx((p) => ({ ...p, flash: Number(e.target.value) }))} /></label>
             </div>
           </div>
         </div>

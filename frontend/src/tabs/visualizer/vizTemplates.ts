@@ -325,6 +325,48 @@ const bloom: VizTemplate = {
   },
 };
 
+// ── Post-effects layer — applies on top of any template, baked into the
+//    bitmap (so it exports). Mirror / kaleidoscope, vignette, grain, flash.
+export interface VizEffects {
+  mirror: 'none' | 'h' | 'quad';
+  vignette: number;  // 0..1
+  grain: number;     // 0..1
+  flash: number;     // 0..1 beat flash
+}
+
+export function applyEffects(
+  ctx: CanvasRenderingContext2D, w: number, h: number,
+  beat: number, accent: string, fx: VizEffects,
+): void {
+  if (fx.mirror === 'h' || fx.mirror === 'quad') {
+    ctx.save(); ctx.scale(-1, 1);
+    ctx.drawImage(ctx.canvas, 0, 0, w / 2, h, -w, 0, w / 2, h);   // left → right
+    ctx.restore();
+  }
+  if (fx.mirror === 'quad') {
+    ctx.save(); ctx.scale(1, -1);
+    ctx.drawImage(ctx.canvas, 0, 0, w, h / 2, 0, -h, w, h / 2);   // top → bottom
+    ctx.restore();
+  }
+  if (fx.flash > 0 && beat > 0.5) {
+    ctx.fillStyle = rgba(accent, beat * fx.flash * 0.3);
+    ctx.fillRect(0, 0, w, h);
+  }
+  if (fx.vignette > 0) {
+    const g = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.28, w / 2, h / 2, Math.max(w, h) * 0.72);
+    g.addColorStop(0, 'rgba(0,0,0,0)');
+    g.addColorStop(1, `rgba(0,0,0,${fx.vignette})`);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+  }
+  if (fx.grain > 0) {
+    const n = Math.floor(fx.grain * w * h / 3400);
+    for (let i = 0; i < n; i++) {
+      ctx.fillStyle = `rgba(255,255,255,${Math.random() * 0.07 * fx.grain})`;
+      ctx.fillRect(Math.random() * w, Math.random() * h, 1.5, 1.5);
+    }
+  }
+}
+
 export const TEMPLATES: VizTemplate[] = [radial, bars, ribbon, field, ringsT, objectT, starfield, terrain, bloom];
 
 export function resetTemplateState(): void { particles = []; rings = []; stars = []; terrainRows = []; }

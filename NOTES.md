@@ -10,6 +10,10 @@ Five new high-quality templates joined the four from v0.1.42:
 - **Frequency terrain** — a scrolling pseudo-3D landscape shaped by the spectrum.
 - **Spectrum bloom** — a symmetric radial mandala from the spectrum.
 
+
+### Custom effects — layer on any template
+New toggleable post-effects that work over *every* template and bake into the export: **Mirror / Kaleidoscope**, **Vignette**, **film **Grain****, and a **Beat flash**. Stack them with the colors, sensitivity, shake and glow.
+
 All react to your colors, sensitivity, beat-shake and glow, in 16:9 / 9:16 / 1:1, and export to MP4.
 
 ### Catalog — masters too
