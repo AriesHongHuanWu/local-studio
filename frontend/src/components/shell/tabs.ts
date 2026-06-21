@@ -48,6 +48,8 @@ const TABS_BY_MODE: Record<AppMode, TabKey[]> = {
   tools: ['transcribe', 'settings'],
   // download → the Downloader + Song Analyzer lives in 辨識; 設定 stays.
   download: ['transcribe', 'settings'],
+  // catalog → the projects home lives in 辨識; 設定 stays.
+  catalog: ['transcribe', 'settings'],
 };
 
 /** The ordered TabKeys a given product mode should show in the rail/router. */

@@ -1,0 +1,87 @@
+/* Catalog (作品集) — projects home + the AddToProject picker. */
+
+.al-catalog__newrow { display: flex; gap: 10px; margin-bottom: 16px; max-width: 520px; }
+.al-catalog__newinput {
+  flex: 1; min-width: 0; padding: 9px 12px;
+  border: 1px solid var(--al-hairline); border-radius: var(--al-radius-ctrl);
+  background: var(--al-surface); color: var(--al-ink); font-size: var(--al-text-sm);
+}
+.al-catalog__newinput:focus { outline: none; border-color: var(--al-gold); }
+.al-catalog__newbtn { flex: none; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+
+.al-catalog__empty { color: var(--al-ink-faint); font-size: var(--al-text-sm); line-height: 1.6; max-width: 560px; }
+
+.al-catalog__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.al-catalog__card {
+  display: flex; flex-direction: column; gap: 6px; align-items: flex-start;
+  padding: 14px 15px; text-align: left; cursor: pointer;
+  border: 1px solid var(--al-hairline); border-radius: var(--al-radius-panel); background: var(--al-surface);
+  transition: border-color var(--al-dur-focus) var(--al-ease-ink), background var(--al-dur-focus) var(--al-ease-ink);
+}
+.al-catalog__card:hover { border-color: var(--al-gold); background: var(--al-surface-2, var(--al-surface)); }
+.al-catalog__cardname { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; font-size: var(--al-text-md); color: var(--al-ink); }
+.al-catalog__cardname svg { color: var(--al-gold); }
+.al-catalog__cardhl { font-family: var(--al-font-mono); font-size: var(--al-text-xs); color: var(--al-gold); }
+.al-catalog__cardmeta { font-size: var(--al-text-xs); color: var(--al-ink-faint); }
+
+/* detail */
+.al-catalog__back {
+  display: inline-flex; align-items: center; gap: 4px; background: none; border: none; cursor: pointer;
+  color: var(--al-ink-faint); font-size: var(--al-text-sm); padding: 0; margin-bottom: 12px;
+}
+.al-catalog__back:hover { color: var(--al-ink); }
+.al-catalog__dethead { display: flex; align-items: center; gap: 10px; }
+.al-catalog__deticon { color: var(--al-gold); flex: none; }
+.al-catalog__detname {
+  flex: 1; min-width: 0; background: none; border: none; border-bottom: 1px solid transparent;
+  font-size: 22px; font-weight: 600; color: var(--al-ink); padding: 2px 0;
+}
+.al-catalog__detname:hover, .al-catalog__detname:focus { outline: none; border-bottom-color: var(--al-hairline-strong); }
+.al-catalog__del { background: none; border: none; color: var(--al-ink-faint); cursor: pointer; padding: 6px; flex: none; }
+.al-catalog__del:hover { color: var(--al-error, #d9534f); }
+.al-catalog__dethl { font-family: var(--al-font-mono); font-size: var(--al-text-sm); color: var(--al-gold); margin: 4px 0 14px; }
+
+.al-catalog__items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.al-catalog__item {
+  display: flex; align-items: center; gap: 11px; padding: 9px 12px;
+  border: 1px solid var(--al-hairline); border-radius: 10px; background: var(--al-surface);
+}
+.al-catalog__itemicon { flex: none; display: flex; color: var(--al-ink-muted); }
+.al-catalog__itemicon--beat { color: var(--al-gold); }
+.al-catalog__itemicon--master { color: var(--al-green, #5fc77e); }
+.al-catalog__itemicon--vocal { color: var(--al-amber, #d8a657); }
+.al-catalog__itemtext { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.al-catalog__itemlabel { font-size: var(--al-text-sm); color: var(--al-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.al-catalog__itemmeta { font-size: var(--al-text-xs); color: var(--al-ink-faint); }
+.al-catalog__itemactions { display: flex; gap: 4px; flex: none; }
+.al-catalog__ibtn {
+  display: inline-flex; padding: 5px; border: 1px solid var(--al-hairline); border-radius: 6px;
+  background: var(--al-surface-2); color: var(--al-ink-muted); cursor: pointer;
+}
+.al-catalog__ibtn:hover { color: var(--al-ink); border-color: var(--al-hairline-strong); }
+.al-catalog__ibtn[draggable="true"] { cursor: grab; }
+
+/* ── AddToProject picker (used across flows) ───────────────────────── */
+.al-addproj { position: relative; display: inline-block; }
+.al-addproj__btn { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.al-addproj__pop {
+  position: absolute; z-index: 30; top: calc(100% + 6px); left: 0;
+  min-width: 240px; padding: 10px; display: flex; flex-direction: column; gap: 8px;
+  border: 1px solid var(--al-hairline-strong); border-radius: var(--al-radius-panel);
+  background: var(--al-surface); box-shadow: var(--al-shadow-pop, 0 8px 24px rgba(0,0,0,.35));
+}
+.al-addproj__new { display: flex; gap: 6px; }
+.al-addproj__new input {
+  flex: 1; min-width: 0; padding: 7px 10px; border: 1px solid var(--al-hairline);
+  border-radius: 7px; background: var(--al-surface-2); color: var(--al-ink); font-size: var(--al-text-sm);
+}
+.al-addproj__new input:focus { outline: none; border-color: var(--al-gold); }
+.al-addproj__list { display: flex; flex-direction: column; gap: 2px; max-height: 220px; overflow-y: auto; }
+.al-addproj__listlabel { font-size: var(--al-text-xs); color: var(--al-ink-faint); margin: 2px 0; }
+.al-addproj__item {
+  display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  padding: 6px 9px; border: none; border-radius: 6px; background: none;
+  color: var(--al-ink); font-size: var(--al-text-sm); cursor: pointer; text-align: left;
+}
+.al-addproj__item:hover { background: var(--al-surface-2); }
+.al-addproj__item small { color: var(--al-ink-faint); font-family: var(--al-font-mono); }

@@ -1,17 +1,16 @@
-# Local Studio v0.1.40
+# Local Studio v0.1.41
 
-🎯 **Per-platform delivery + compliance check** — master straight to a platform's spec and *know* it's release-ready.
+🗂️ **Catalog — your songs.** The start of the connective tissue that makes Local Studio one studio instead of scattered tools.
 
-The Mastering loudness target now offers the real platform specs:
-- **Spotify / YouTube / TikTok** (−14 LUFS)
-- **Apple Music** (−16 LUFS)
-- **Balanced** (−12 LUFS)
-- **SoundCloud / Loud** (−9 LUFS)
-- **Club / DJ** (−7 LUFS)
+A new **Catalog** mode (top of the sidebar) is your home: a grid of **song projects**, each one gathering a song's artifacts in one place — the beat you downloaded, its analysis (key/BPM/genre), masters, processed vocals — instead of every job being a one-off you lose track of.
 
-…each with the correct true-peak ceiling. After mastering, the result shows a **✓ "Meets delivery spec"** badge when the output lands within ±0.8 LU of the target *and* the true-peak is under the ceiling — so you can deliver with confidence instead of guessing.
+- In the **Downloader**, after you download/analyze a beat there's now an **"Add to project"** button — create a new song or add to an existing one. The project picks up the beat's key/BPM/genre as its headline.
+- Open a project to see its items, with **reveal-in-folder** and **drag-to-DAW** on each (desktop).
+- Everything is stored locally.
 
-Everything from v0.1.39 is included (Compose tools — scale/chords/progressions/click, and the one-click Vocal Chain).
+This is the first step of the project-centric workflow; more modes (Mastering, Vocal chain, Lyrics) will feed into projects, and the sidebar will reorganize around the production journey, in coming updates.
+
+Everything from v0.1.40 is included (Compose tools, Vocal Chain, per-platform delivery + compliance).
 
 Support: ☕ [Ko-fi](https://ko-fi.com/arieswu) · [PayPal](https://paypal.me/Arieshonghuan) · [GitHub Sponsors](https://github.com/sponsors/AriesHongHuanWu).
 

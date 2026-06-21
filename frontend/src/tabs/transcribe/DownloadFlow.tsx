@@ -25,6 +25,7 @@ import {
 } from '../../api/download';
 import { hasTauri, saveBlobToDownloads, saveBinaryBlob, revealPath, dragOutPath } from '../export/saveFile';
 import { SongAnalysisPanel } from './download/SongAnalysisPanel';
+import { AddToProject } from '../catalog/AddToProject';
 import './download/download.css';
 
 interface DownloadResult {
@@ -296,6 +297,14 @@ export function DownloadFlow() {
                       onClick={() => saveBinaryBlob(result.blob, result.filename, { name: 'Media', extensions: [result.ext] })}>
                 <DownloadCloud size={15} /> {t('download.saveAs')}
               </button>
+              <AddToProject
+                defaultName={result.title}
+                item={{
+                  kind: 'beat', label: result.filename, path: result.path ?? undefined,
+                  format: result.ext, sizeBytes: result.blob.size,
+                  key: analysis?.key.name, bpm: analysis?.tempo.bpmRounded, genre: analysis?.genre.top,
+                }}
+              />
             </div>
           </div>
 

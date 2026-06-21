@@ -31,6 +31,12 @@ export const common: Record<string, Entry> = {
   'common.cat.audio': { zh: '音訊製作', en: 'Audio' },
   'common.cat.video': { zh: '影片製作', en: 'Video' },
   'common.cat.get': { zh: '取得素材', en: 'Get media' },
+  'common.cat.home': { zh: '作品集', en: 'Catalog' },
+  'common.mode.catalog': { zh: '作品集', en: 'Catalog' },
+  'common.mode.catalogTitle': {
+    zh: '作品集 — 你的歌:把每首歌的 beat、分析、母帶、人聲收在一個作品裡',
+    en: 'Catalog — your songs: each project gathers a song\'s beat, analysis, masters and vocals',
+  },
   'common.pin.add': { zh: '釘選到最上面', en: 'Pin to top' },
   'common.pin.remove': { zh: '取消釘選', en: 'Unpin' },
   'common.mode.songTitle': {

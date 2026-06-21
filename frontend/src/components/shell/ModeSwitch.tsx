@@ -8,7 +8,7 @@
    ────────────────────────────────────────────────────────────────── */
 
 import { useCallback, useRef } from 'react';
-import { Music, Clapperboard, Eraser, Disc3, Pin, Wrench, DownloadCloud } from 'lucide-react';
+import { Music, Clapperboard, Eraser, Disc3, Pin, Wrench, DownloadCloud, Library } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useMode } from '../../state/useMode';
 import type { AppMode } from '../../state/useMode';
@@ -17,6 +17,7 @@ import { useT } from '../../i18n';
 import './mode-switch.css';
 
 const MODE_DEFS: Record<AppMode, { labelKey: string; titleKey: string; icon: LucideIcon }> = {
+  catalog: { labelKey: 'common.mode.catalog', titleKey: 'common.mode.catalogTitle', icon: Library },
   song: { labelKey: 'common.mode.song', titleKey: 'common.mode.songTitle', icon: Music },
   video: { labelKey: 'common.mode.video', titleKey: 'common.mode.videoTitle', icon: Clapperboard },
   clean: { labelKey: 'common.mode.clean', titleKey: 'common.mode.cleanTitle', icon: Eraser },
@@ -26,6 +27,7 @@ const MODE_DEFS: Record<AppMode, { labelKey: string; titleKey: string; icon: Luc
 };
 
 const CATEGORIES: { key: string; labelKey: string; modes: AppMode[] }[] = [
+  { key: 'home', labelKey: 'common.cat.home', modes: ['catalog'] },
   { key: 'get', labelKey: 'common.cat.get', modes: ['download'] },
   { key: 'audio', labelKey: 'common.cat.audio', modes: ['song', 'master', 'tools'] },
   { key: 'video', labelKey: 'common.cat.video', modes: ['video', 'clean'] },

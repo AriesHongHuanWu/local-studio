@@ -18,6 +18,7 @@ import { CleanTextFlow } from './CleanTextFlow';
 import { MasteringFlow } from './MasteringFlow';
 import { ToolboxFlow } from './ToolboxFlow';
 import { DownloadFlow } from './DownloadFlow';
+import { CatalogFlow } from '../catalog/CatalogFlow';
 import { usePendingMedia } from '../../state/usePendingMedia';
 import { useMeta } from '../../state/useMeta';
 import { useJob } from '../../state/useJob';
@@ -366,6 +367,11 @@ export function TranscribeTab({ onOpenEditor }: TranscribeTabProps) {
   // downloaded file off to song/video via usePendingMedia (consumed below).
   if (appMode === 'download') {
     return <DownloadFlow />;
+  }
+
+  // Catalog (作品集) — the projects home that gathers each song's artifacts.
+  if (appMode === 'catalog') {
+    return <CatalogFlow />;
   }
 
   return (
