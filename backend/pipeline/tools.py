@@ -229,6 +229,16 @@ def _encode(data: "np.ndarray", sr: int, path: str, fmt: str) -> None:
             raise
 
 
+def _t_vocal_chain(data: "np.ndarray", sr: int, params: dict) -> tuple["np.ndarray", int]:
+    """一鍵人聲處理鏈:依風格自動套高通/減法EQ/De-ess/壓縮/臨場空氣/飽和/殘響延遲。"""
+    from . import vocalchain as VC
+    style = str(params.get("style", "pop"))
+    intensity = float(params.get("intensity", 0.7))
+    space = float(params.get("space", 0.5))
+    out = VC.vocal_chain(data, sr, style=style, intensity=intensity, space=space)
+    return out, sr
+
+
 def _t_denoise(data: "np.ndarray", sr: int, params: dict) -> tuple["np.ndarray", int]:
     """頻譜閘降噪:估各頻率噪音底(安靜幀的低分位)→ 軟性扣除。適合語音/口白底噪。"""
     amt = float(np.clip(params.get("amount", 0.6), 0.0, 1.0))
@@ -276,6 +286,23 @@ TOOLS: dict[str, dict] = {
         "desc": "偵測歌曲的調性與速度(取樣、混音、DJ 對拍好用)。",
         "descEn": "Detect a song's musical key and tempo.",
         "params": [], "fn": _t_keybpm,
+    },
+    "vocal_chain": {
+        "kind": "process", "category": "vocal", "icon": "Mic",
+        "label": "一鍵人聲鏈", "labelEn": "One-click vocal chain",
+        "desc": "依風格自動套 高通→減法EQ→De-ess→壓縮→臨場/空氣→飽和→殘響/延遲,把人聲做成 radio vocal。",
+        "descEn": "Auto HPF→EQ→de-ess→comp→presence/air→saturation→reverb/delay by style — a radio vocal in one click.",
+        "params": [
+            {"key": "style", "label": "風格", "type": "select", "default": "pop",
+             "options": [{"value": "pop", "label": "Pop"}, {"value": "hiphop", "label": "Hip-Hop / Rap"},
+                         {"value": "rnb", "label": "R&B"}, {"value": "rock", "label": "Rock"},
+                         {"value": "acoustic", "label": "Acoustic"}, {"value": "lofi", "label": "Lo-fi"}]},
+            {"key": "intensity", "label": "力度", "type": "number", "min": 0.2, "max": 1.0, "step": 0.05, "default": 0.7},
+            {"key": "space", "label": "空間(殘響/延遲)", "type": "number", "min": 0.0, "max": 1.0, "step": 0.05, "default": 0.5},
+            {"key": "format", "label": "輸出格式", "type": "select", "default": "wav",
+             "options": [{"value": "wav", "label": "WAV (24-bit)"}, {"value": "flac", "label": "FLAC"},
+                         {"value": "mp3", "label": "MP3"}]}],
+        "fn": _t_vocal_chain,
     },
     "loudness_normalize": {
         "kind": "process", "category": "loudness", "icon": "Gauge",

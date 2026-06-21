@@ -20,7 +20,7 @@ import './toolbox.css';
 const ICONS: Record<string, LucideIcon> = {
   Mic, Activity, Music2, Gauge, Zap, Wind, Scissors, TrendingUp, Move, Crosshair, FileAudio, Download,
 };
-const CAT_ORDER = ['fetch', 'analyze', 'loudness', 'repair', 'edit', 'stereo', 'export'];
+const CAT_ORDER = ['vocal', 'analyze', 'loudness', 'repair', 'edit', 'stereo', 'export'];
 
 export function ToolboxFlow() {
   const t = useT();

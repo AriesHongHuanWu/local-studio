@@ -77,6 +77,7 @@ export const common: Record<string, Entry> = {
     en: 'I confirm I have the right to download this content (my own work, Creative Commons, royalty-free, or licensed beats).',
   },
   'tools.fetch.go': { zh: '下載音訊', en: 'Download audio' },
+  'tools.cat.vocal': { zh: '人聲', en: 'Vocal' },
   'tools.cat.analyze': { zh: '分析', en: 'Analyze' },
   'tools.cat.loudness': { zh: '響度', en: 'Loudness' },
   'tools.cat.repair': { zh: '修復 / 清理', en: 'Repair' },
