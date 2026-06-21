@@ -110,29 +110,8 @@ export function ToolboxFlow() {
         </label>
       )}
 
-      {cats.map((cat) => (
-        <section key={cat} className="al-section">
-          <p className="al-toolbox__cat">{t(`tools.cat.${cat}`)}</p>
-          <div className="al-toolbox__grid">
-            {byCat.get(cat)!.map((tool) => {
-              const Icon = ICONS[tool.icon] ?? Wrench;
-              return (
-                <button
-                  key={tool.id}
-                  type="button"
-                  className={`al-toolcard${sel?.id === tool.id ? ' al-toolcard--active' : ''}`}
-                  onClick={() => pick(tool)}
-                >
-                  <span className="al-toolcard__icon"><Icon size={18} /></span>
-                  <span className="al-toolcard__name">{label(tool)}</span>
-                  <span className="al-toolcard__desc">{desc(tool)}</span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      ))}
-
+      {/* Active tool's controls sit right under the file drop (top); the tool
+          switcher grid is below it. */}
       {sel && (
         <section className="al-section al-toolrun">
           <p className="al-toolrun__title">{label(sel)}</p>
@@ -182,6 +161,29 @@ export function ToolboxFlow() {
           {result && <ResultView result={result} />}
         </section>
       )}
+
+      {cats.map((cat) => (
+        <section key={cat} className="al-section">
+          <p className="al-toolbox__cat">{t(`tools.cat.${cat}`)}</p>
+          <div className="al-toolbox__grid">
+            {byCat.get(cat)!.map((tool) => {
+              const Icon = ICONS[tool.icon] ?? Wrench;
+              return (
+                <button
+                  key={tool.id}
+                  type="button"
+                  className={`al-toolcard${sel?.id === tool.id ? ' al-toolcard--active' : ''}`}
+                  onClick={() => pick(tool)}
+                >
+                  <span className="al-toolcard__icon"><Icon size={18} /></span>
+                  <span className="al-toolcard__name">{label(tool)}</span>
+                  <span className="al-toolcard__desc">{desc(tool)}</span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      ))}
     </div>
   );
 }
