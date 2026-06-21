@@ -94,10 +94,9 @@ export function CutFlow() {
     if (id) useEditor.getState().splitClip(id, pb.getTime());
   }, [pb]);
 
-  const doExport = useCallback(() => {
-    const bitrate = Math.round(Math.min(40_000_000, Math.max(4_000_000, doc.width * doc.height * fps * 0.1)));
-    void pb.exportVideo({ name, fps, bitrate, format });
-  }, [pb, name, fps, format, doc.width, doc.height]);
+  const bitrate = Math.round(Math.min(48_000_000, Math.max(6_000_000, doc.width * doc.height * fps * 0.12)));
+  const doExport = useCallback(() => { void pb.exportVideoHQ({ name, fps, bitrate, format }); }, [pb, name, fps, format, bitrate]);
+  const doQuick = useCallback(() => { void pb.exportVideo({ name, fps, bitrate, format }); }, [pb, name, fps, format, bitrate]);
 
   const handlers = useMemo(() => ({
     togglePlay: pb.toggle,
@@ -139,9 +138,12 @@ export function CutFlow() {
             <Clock getTime={pb.getTime} total={docDuration(doc)} />
             <button type="button" className="al-cut__icbtn" onClick={() => setHelp(true)} title={en ? 'Shortcuts' : '快捷鍵'}><Keyboard size={15} /></button>
             <span className="al-cut__spacer" />
+            {!pb.exporting && (
+              <button type="button" className="al-btn al-btn--ghost al-btn--sm" onClick={doQuick} title={en ? 'Quick real-time export' : '快速即時匯出'}>{en ? 'Quick' : '快速'}</button>
+            )}
             <button type="button" className="al-btn al-cut__export al-btn--sm" onClick={doExport} disabled={pb.exporting}>
               {pb.exporting ? <Loader2 size={14} className="al-spin" /> : <Film size={14} />}
-              {pb.exporting ? `${en ? 'Exporting' : '匯出中'} ${pb.expPct}%` : (en ? 'Export' : '匯出')}
+              {pb.exporting ? `${en ? 'Exporting' : '匯出中'} ${pb.expPct}%` : `${en ? 'Export' : '匯出'}${pb.hqAvailable ? ' · GPU' : ''}`}
             </button>
           </div>
           <div className="al-cut__exprow">
@@ -156,7 +158,7 @@ export function CutFlow() {
               <option value="mp4">MP4</option><option value="webm">WebM</option>
             </select>
           </div>
-          {pb.exporting && <p className="al-cut__exphint">{en ? 'Export plays the timeline through once to record — keep this window focused.' : '匯出會把時間軸完整播一次來錄製,過程請保持此視窗在前景。'}</p>}
+          {pb.exporting && <p className="al-cut__exphint">{en ? 'Rendering at full quality — keep this window focused. GPU export renders offline (faster than real-time for stills/captions).' : '正在以最高品質輸出 — 請保持此視窗在前景。GPU 匯出為離線算圖(靜態/字幕快於即時)。'}</p>}
           {pb.msg === 'saved' && !pb.exporting && (
             <div className="al-cut__saved">
               <span>{en ? 'Exported ✓' : '已匯出 ✓'}</span>

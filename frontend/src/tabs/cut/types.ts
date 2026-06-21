@@ -77,6 +77,9 @@ export interface Clip {
   filters: Filters;
   blend: GlobalCompositeOperation;
   chroma: Chroma;
+  mask: 'none' | 'circle' | 'rounded';
+  glitch: number; // 0..1 digital slice displacement
+  scan: number; // 0..1 scanline overlay
 
   /* timing */
   speed: number; // 1 = normal (video/audio)
@@ -172,6 +175,9 @@ export function makeClip(kind: ClipKind, over: Partial<Clip>): Clip {
     filters: over.filters ?? neutralFilters(),
     blend: over.blend ?? 'source-over',
     chroma: over.chroma ?? { on: false, color: '#00ff00', threshold: 0.4, smooth: 0.1 },
+    mask: over.mask ?? 'none',
+    glitch: over.glitch ?? 0,
+    scan: over.scan ?? 0,
     speed: over.speed ?? 1,
     transIn: over.transIn ?? { type: 'none', dur: 0.5 },
     transOut: over.transOut ?? { type: 'none', dur: 0.5 },

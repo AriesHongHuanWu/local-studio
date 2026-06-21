@@ -16,6 +16,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { saveBinaryBlob } from '../export/saveFile';
 import { useEditor, docDuration } from './useEditor';
 import { buildFilter, transformAt, transitionMod, textAnim, chromaKey } from './effects';
+import { exportHQ, webcodecsSupported, type AudioDesc } from './exportHQ';
 import type { Clip, EditDoc } from './types';
 
 const nowSec = () => performance.now() / 1000;
@@ -66,8 +67,19 @@ export interface Playback {
   toggle: () => void;
   seekTo: (t: number) => void;
   exportVideo: (opts: ExportOpts) => Promise<void>;
+  exportVideoHQ: (opts: ExportOpts) => Promise<void>;
+  hqAvailable: boolean;
   getTime: () => number;
   clearMsg: () => void;
+}
+
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
 }
 
 function gainFactor(c: Clip, t: number): number {
@@ -89,6 +101,7 @@ export function usePlayback({ canvasRef, poolRef, cursorRef, pxPerSec, onExporte
   const off = useRef<HTMLCanvasElement | null>(null);
   const recRef = useRef<MediaRecorder | null>(null);
   const exportBusyRef = useRef(false);
+  const hqRef = useRef(false);
   const tRef = useRef(0);
   const t0Ref = useRef(0);
   const playingRef = useRef(false);
@@ -209,9 +222,27 @@ export function usePlayback({ canvasRef, poolRef, cursorRef, pxPerSec, onExporte
     ctx.translate(W / 2 + tr.x + m.tx, H / 2 + tr.y + m.ty);
     ctx.rotate(((tr.rotation + m.rot) * Math.PI) / 180);
     ctx.scale((c.flipH ? -1 : 1) * tr.scale * m.sc, (c.flipV ? -1 : 1) * tr.scale * m.sc);
-    // wipe: clip in the media's local space so it follows the transform
+    // mask: clip the media to a shape (in local space, follows the transform)
+    if (c.mask === 'circle') { ctx.beginPath(); ctx.ellipse(0, 0, dw / 2, dh / 2, 0, 0, Math.PI * 2); ctx.clip(); }
+    else if (c.mask === 'rounded') { roundRect(ctx, -dw / 2, -dh / 2, dw, dh, Math.min(dw, dh) * 0.12); ctx.clip(); }
+    // wipe transition clips in local space
     if (m.clipFrac < 1) { ctx.beginPath(); ctx.rect(-dw / 2, -dh / 2, dw * m.clipFrac, dh); ctx.clip(); }
-    try { ctx.drawImage(source, -dw / 2, -dh / 2, dw, dh); } catch { /* not decodable */ }
+    if (c.glitch > 0) {
+      const bands = 6 + Math.round(c.glitch * 8);
+      const bh = dh / bands; const sbh = sh / bands;
+      for (let i = 0; i < bands; i++) {
+        const jitter = (Math.random() - 0.5) * c.glitch * dw * 0.22;
+        try { ctx.drawImage(source, 0, i * sbh, sw, sbh, -dw / 2 + jitter, -dh / 2 + i * bh, dw, bh + 1); } catch { /* skip band */ }
+      }
+    } else {
+      try { ctx.drawImage(source, -dw / 2, -dh / 2, dw, dh); } catch { /* not decodable */ }
+    }
+    if (c.scan > 0) {
+      ctx.filter = 'none';
+      ctx.globalCompositeOperation = 'multiply';
+      ctx.fillStyle = `rgba(0,0,0,${(c.scan * 0.5).toFixed(2)})`;
+      for (let y = -dh / 2; y < dh / 2; y += 3) ctx.fillRect(-dw / 2, y, dw, 1.4);
+    }
     ctx.restore();
   }, []);
 
@@ -332,9 +363,42 @@ export function usePlayback({ canvasRef, poolRef, cursorRef, pxPerSec, onExporte
     ctx.filter = 'none';
   }, [canvasRef, drawMedia, drawShape, drawText]);
 
+  // Seek every active VIDEO clip to its source time at t and wait for the
+  // frames to be ready — so an offline render is frame-accurate.
+  const seekActiveVideo = useCallback((doc: EditDoc, t: number): Promise<void> => {
+    const waits: Promise<void>[] = [];
+    for (const tr of doc.tracks) {
+      if (tr.kind !== 'visual' || tr.hidden) continue;
+      for (const c of tr.clips) {
+        if (c.kind !== 'video') continue;
+        if (t < c.start || t >= c.start + c.duration) continue;
+        const e = pool.current.get(c.id);
+        if (!(e?.el instanceof HTMLVideoElement)) continue;
+        const el = e.el;
+        const local = c.inPoint + (t - c.start) * Math.max(0.01, c.speed);
+        if (el.readyState >= 2 && Math.abs(el.currentTime - local) < 0.001) continue;
+        waits.push(new Promise<void>((res) => {
+          let done = false;
+          const finish = () => { if (done) return; done = true; el.removeEventListener('seeked', finish); res(); };
+          el.addEventListener('seeked', finish);
+          try { el.currentTime = local; } catch { finish(); }
+          setTimeout(finish, 220);
+        }));
+      }
+    }
+    return Promise.all(waits).then(() => undefined);
+  }, []);
+
+  const renderFrameAt = useCallback(async (doc: EditDoc, t: number) => {
+    tRef.current = t;
+    await seekActiveVideo(doc, t);
+    composite(doc);
+  }, [seekActiveVideo, composite]);
+
   useEffect(() => {
     if (!off.current) off.current = document.createElement('canvas');
     const frame = () => {
+      if (hqRef.current) { rafRef.current = requestAnimationFrame(frame); return; } // HQ export owns the canvas
       const doc = useEditor.getState().doc;
       const dur = docDuration(doc);
       if (playingRef.current) {
@@ -438,5 +502,47 @@ export function usePlayback({ canvasRef, poolRef, cursorRef, pxPerSec, onExporte
     onExported?.(outPath);
   }, [canvasRef, ensureAudio, seekTo, play, pause, onExported]);
 
-  return { playing, exporting, expPct, msg, play, pause, toggle, seekTo, exportVideo, getTime, clearMsg };
+  // GPU / high-quality offline export via WebCodecs, with MediaRecorder fallback.
+  const exportVideoHQ = useCallback(async (opts: ExportOpts) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    if (!webcodecsSupported()) { await exportVideo(opts); return; }
+    if (exportBusyRef.current) return;
+    exportBusyRef.current = true;
+    const doc = useEditor.getState().doc;
+    const dur = docDuration(doc);
+    if (dur <= 0) { setMsg('empty'); exportBusyRef.current = false; return; }
+    ensureAudio();
+    syncPool(doc);
+    setExporting(true); setExpPct(0); setMsg(null);
+    hqRef.current = true;
+    try {
+      const audio: AudioDesc[] = [];
+      for (const tr of doc.tracks) for (const c of tr.clips) {
+        if ((c.kind === 'audio' || c.kind === 'video') && c.src) {
+          audio.push({ src: c.src, start: c.start, inPoint: c.inPoint, duration: c.duration, speed: c.speed, gain: c.gain, fadeIn: c.fadeIn, fadeOut: c.fadeOut, muted: tr.kind === 'audio' && tr.muted });
+        }
+      }
+      const buffer = await exportHQ({ canvas, width: doc.width, height: doc.height, fps: opts.fps, bitrate: opts.bitrate, duration: dur, audio, renderAt: (t) => renderFrameAt(doc, t), onProgress: (p) => setExpPct(p) });
+      hqRef.current = false;
+      const blob = new Blob([buffer], { type: 'video/mp4' });
+      const filename = `${opts.name.replace(/[^\w\-]+/g, '_') || 'edit'}.mp4`;
+      let outPath: string | null = null;
+      const out = await saveBinaryBlob(blob, filename, { name: 'Video', extensions: ['mp4'] });
+      if (out.kind === 'tauri') { outPath = out.path; setMsg('saved'); } else if (out.kind === 'download') setMsg('saved'); else setMsg(null);
+      setExporting(false); setExpPct(0);
+      exportBusyRef.current = false;
+      seekTo(0);
+      onExported?.(outPath);
+    } catch {
+      // WebCodecs failed — clean up and fall back to MediaRecorder
+      hqRef.current = false;
+      setExporting(false); setExpPct(0);
+      exportBusyRef.current = false;
+      try { await exportVideo(opts); }
+      catch { setMsg('failed'); setExporting(false); setExpPct(0); exportBusyRef.current = false; }
+    }
+  }, [canvasRef, ensureAudio, exportVideo, syncPool, renderFrameAt, seekTo, onExported]);
+
+  return { playing, exporting, expPct, msg, play, pause, toggle, seekTo, exportVideo, exportVideoHQ, hqAvailable: webcodecsSupported(), getTime, clearMsg };
 }

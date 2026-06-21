@@ -98,10 +98,20 @@ export function Inspector({ en, onSplit, getTime }: Props) {
             <Slider label={en ? 'Rotation' : '旋轉'} min={-180} max={180} step={1} value={c.rotation} onChange={(v) => up({ rotation: v })} />
             <Slider label={en ? 'Opacity' : '不透明度'} min={0} max={1} step={0.02} value={c.opacity} onChange={(v) => up({ opacity: v })} />
             {isMedia && (
-              <div className="al-cut__row2">
-                <button type="button" className={`al-btn al-btn--ghost al-btn--sm${c.flipH ? ' is-on' : ''}`} onClick={() => up({ flipH: !c.flipH })}><FlipHorizontal2 size={13} />{en ? 'Flip H' : '水平翻'}</button>
-                <button type="button" className={`al-btn al-btn--ghost al-btn--sm${c.flipV ? ' is-on' : ''}`} onClick={() => up({ flipV: !c.flipV })}><FlipVertical2 size={13} />{en ? 'Flip V' : '垂直翻'}</button>
-              </div>
+              <>
+                <div className="al-cut__row2">
+                  <button type="button" className={`al-btn al-btn--ghost al-btn--sm${c.flipH ? ' is-on' : ''}`} onClick={() => up({ flipH: !c.flipH })}><FlipHorizontal2 size={13} />{en ? 'Flip H' : '水平翻'}</button>
+                  <button type="button" className={`al-btn al-btn--ghost al-btn--sm${c.flipV ? ' is-on' : ''}`} onClick={() => up({ flipV: !c.flipV })}><FlipVertical2 size={13} />{en ? 'Flip V' : '垂直翻'}</button>
+                </div>
+                <span className="al-cut__rowlabel">{en ? 'Position / PiP' : '位置 / 子母畫面'}</span>
+                <div className="al-cut__seg">
+                  <button type="button" className="al-cut__segbtn" onClick={() => up({ scale: 1, x: 0, y: 0 })} title={en ? 'Center' : '置中'}>◼</button>
+                  <button type="button" className="al-cut__segbtn" onClick={() => up({ scale: 0.34, x: -doc.width * 0.32, y: -doc.height * 0.30 })} title="PiP ↖">◤</button>
+                  <button type="button" className="al-cut__segbtn" onClick={() => up({ scale: 0.34, x: doc.width * 0.32, y: -doc.height * 0.30 })} title="PiP ↗">◥</button>
+                  <button type="button" className="al-cut__segbtn" onClick={() => up({ scale: 0.34, x: -doc.width * 0.32, y: doc.height * 0.30 })} title="PiP ↙">◣</button>
+                  <button type="button" className="al-cut__segbtn" onClick={() => up({ scale: 0.34, x: doc.width * 0.32, y: doc.height * 0.30 })} title="PiP ↘">◢</button>
+                </div>
+              </>
             )}
             <div className="al-cut__kf">
               <button type="button" className="al-btn al-btn--ghost al-btn--sm" onClick={() => addKey(c.id, localT)} title={en ? 'Add keyframe at playhead' : '在播放頭加關鍵影格'}><Diamond size={12} />{en ? 'Keyframe' : '關鍵影格'}</button>
@@ -124,6 +134,16 @@ export function Inspector({ en, onSplit, getTime }: Props) {
             <Slider label={en ? 'Saturation' : '飽和'} min={0} max={2.5} step={0.02} value={c.filters.saturate} onChange={(v) => updateFilters(c.id, { saturate: v })} />
             <Slider label={en ? 'Hue' : '色相'} min={-180} max={180} step={1} value={c.filters.hue} onChange={(v) => updateFilters(c.id, { hue: v })} />
             <Slider label={en ? 'Blur' : '模糊'} min={0} max={20} step={0.5} value={c.filters.blur} onChange={(v) => updateFilters(c.id, { blur: v })} />
+            <Slider label={en ? 'Glitch' : '故障'} min={0} max={1} step={0.02} value={c.glitch} onChange={(v) => up({ glitch: v })} />
+            <Slider label={en ? 'Scanlines' : '掃描線'} min={0} max={1} step={0.02} value={c.scan} onChange={(v) => up({ scan: v })} />
+            <label className="al-cut__row">
+              <span className="al-cut__rowlabel">{en ? 'Mask' : '遮罩'}</span>
+              <div className="al-cut__seg">
+                {(['none', 'circle', 'rounded'] as const).map((mk) => (
+                  <button key={mk} type="button" className={`al-cut__segbtn${c.mask === mk ? ' is-on' : ''}`} onClick={() => up({ mask: mk })}>{mk === 'none' ? (en ? 'None' : '無') : mk === 'circle' ? '◯' : '▢'}</button>
+                ))}
+              </div>
+            </label>
             <label className="al-cut__row">
               <span className="al-cut__rowlabel">{en ? 'Blend' : '混合'}</span>
               <select className="al-cut__select" value={c.blend} onChange={(e) => up({ blend: e.target.value as GlobalCompositeOperation })}>

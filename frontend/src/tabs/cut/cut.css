@@ -229,3 +229,6 @@
 .al-cut__inspector, .al-cut__tools, .al-cut__timeline { box-shadow: 0 1px 0 rgba(255,255,255,.02) inset; }
 .al-cut__canvaswrap { box-shadow: 0 8px 30px rgba(0,0,0,.35); }
 .al-cut__transport { padding: 2px 0; }
+
+/* ── Wave 3: clip waveform, GPU export ─────────────────────────── */
+.al-cut__wave { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; opacity: .8; }

@@ -5,10 +5,39 @@
    diamonds and transition badges. The playhead is moved imperatively.
    ────────────────────────────────────────────────────────────────── */
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Eye, EyeOff, Volume2, VolumeX, Trash2, Lock, Unlock, Film, Music2, Image as ImageIcon, Type, Square, ChevronUp, ChevronDown } from 'lucide-react';
 import { useEditor, docDuration } from './useEditor';
+import { getPeaks, onWaveformReady } from './waveform';
 import type { Clip, ClipKind } from './types';
+
+/** Audio waveform drawn inside an audio/video clip on the timeline. */
+function ClipWave({ src, inPoint, dur, speed, srcDuration, width }: { src: string; inPoint: number; dur: number; speed: number; srcDuration: number; width: number }) {
+  const ref = useRef<HTMLCanvasElement | null>(null);
+  const [ver, setVer] = useState(0);
+  useEffect(() => onWaveformReady(() => setVer((v) => v + 1)), []);
+  useEffect(() => {
+    const cv = ref.current;
+    if (!cv) return;
+    const W = Math.max(1, Math.floor(width));
+    cv.width = W; cv.height = 34;
+    const ctx = cv.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, W, 34);
+    const peaks = getPeaks(src);
+    if (!peaks || !peaks.length || srcDuration <= 0) return;
+    const i0 = Math.max(0, Math.min(peaks.length - 1, Math.floor((inPoint / srcDuration) * peaks.length)));
+    const i1 = Math.max(i0 + 1, Math.min(peaks.length, Math.floor(Math.min(1, (inPoint + dur * Math.max(0.01, speed)) / srcDuration) * peaks.length)));
+    const n = i1 - i0;
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    for (let x = 0; x < W; x++) {
+      const a = peaks[i0 + Math.floor((x / W) * n)] || 0;
+      const h = Math.max(1, a * 30);
+      ctx.fillRect(x, 17 - h / 2, 1, h);
+    }
+  }, [src, inPoint, dur, speed, srcDuration, width, ver]);
+  return <canvas ref={ref} className="al-cut__wave" />;
+}
 
 const KIND_ICON: Record<ClipKind, typeof Film> = { video: Film, image: ImageIcon, audio: Music2, text: Type, shape: Square };
 
@@ -120,6 +149,9 @@ export function Timeline({ pxPerSec, onSeek, cursorRef }: Props) {
                     <div key={c.id} className={`al-cut__clip${sel ? ' is-sel' : ''}${tr.locked ? ' is-locked' : ''}`}
                          style={{ left: c.start * pxPerSec, width: w }}
                          onPointerDown={(e) => startDrag(e, c, 'move', tr.kind, tr.locked)} title={c.name}>
+                      {(c.kind === 'audio' || c.kind === 'video') && c.src && c.srcDuration > 0 && (
+                        <ClipWave src={c.src} inPoint={c.inPoint} dur={c.duration} speed={c.speed} srcDuration={c.srcDuration} width={w} />
+                      )}
                       <span className="al-cut__cliphandle al-cut__cliphandle--l" onPointerDown={(e) => startDrag(e, c, 'left', tr.kind, tr.locked)} />
                       {c.transIn.type !== 'none' && <span className="al-cut__trans al-cut__trans--l" />}
                       <span className="al-cut__cliplabel"><Icon size={12} /> {c.kind === 'text' ? (c.text || 'text').slice(0, 22) : c.name}</span>

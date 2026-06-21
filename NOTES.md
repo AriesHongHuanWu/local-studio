@@ -1,19 +1,17 @@
-# Local Studio v0.1.45
+# Local Studio v0.1.46
 
-## 🎬 NEW: Editor (剪輯室) — a real in-app video editor
+## ⚡ GPU export + a more complete Editor (剪輯室)
 
-The studio is now end-to-end. A full multitrack timeline editor that pulls everything together — drop your mastered audio, a Visualizer video, images and subtitles, then cut, arrange and export a finished video. **All local, no external editor.**
+**GPU export (default).** The **Export** button now renders with the platform **hardware H.264 encoder** via WebCodecs — **offline / faster-than-real-time**, frame-accurate, full bitrate, muxed to MP4. It shows **"Export · GPU"** when hardware encoding is available, and falls back automatically to the real-time recorder if not. A **Quick** button keeps the instant real-time export for fast previews. 720p / 1080p · 24 / 30 / 60 fps.
 
-**Edit** — multitrack timeline (video / audio / text), drag to move, trim by the edges, split, ripple-delete, duplicate, snapping, undo/redo, and keyboard shortcuts (Space, S, Del, ⌘Z, arrows, +/−). Highly customizable tracks: rename, reorder, mute / hide / lock.
+**More complete editing:**
+- **Audio waveforms** drawn inside audio & video clips on the timeline.
+- **Masks** — circle / rounded — per clip.
+- **Glitch** and **scanline** effects.
+- **Picture-in-picture / position presets** — centre + four corners, one click.
 
-**Captions with 質感** — **auto-caption from your audio** (local Whisper), or import SRT / VTT / LRC. Premium caption looks (clean, caption bar, outline, title, gold gradient, neon glow), with font, letter-spacing, line-height, position, outline, shadow and gradient fill — animated in/out.
+Everything from v0.1.45 (multitrack timeline, auto-captions, premium subtitle looks, transitions, filters, chroma key, speed, keyframes, undo/redo, shortcuts, customizable tracks) is included.
 
-**Transitions & effects** — fade, slide, zoom, spin, blur, wipe (in & out); filters + one-tap looks (Cinematic, Vivid, B&W, VHS…); chroma key (green screen); speed; keyframe animation (position / scale / rotation / opacity); and clean **fade in/out**.
-
-**Export** — the preview *is* the render → MP4 / WebM at 720p / 1080p, 24 / 30 / 60 fps, 16:9 / 9:16 / 1:1. Save it, or add it straight to a Project.
-
-Find it under 影片製作 → **剪輯室**.
-
-> Note: the live canvas (filters, transitions, captions) and export need a focused window — give it a try on your real video and let me know what to refine.
+> The GPU export and waveforms need a focused window — give the GPU export a try on a real timeline and tell me how the quality and speed feel.
 
 MIT © 2026 Aries HongHuan Wu · ☕ [Ko-fi](https://ko-fi.com/arieswu) · [PayPal](https://paypal.me/Arieshonghuan)
