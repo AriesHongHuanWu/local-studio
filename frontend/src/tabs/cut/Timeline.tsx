@@ -47,12 +47,13 @@ interface Props {
   onSeek: (t: number) => void;
   cursorRef: React.RefObject<HTMLDivElement | null>;
   tool: 'select' | 'razor';
+  en: boolean;
 }
 
 type DragMode = 'move' | 'left' | 'right';
 const SNAP_PX = 8;
 
-export function Timeline({ pxPerSec, onSeek, cursorRef, tool }: Props) {
+export function Timeline({ pxPerSec, onSeek, cursorRef, tool, en }: Props) {
   const doc = useEditor((s) => s.doc);
   const selectedId = useEditor((s) => s.selectedId);
   const select = useEditor((s) => s.select);
@@ -61,6 +62,7 @@ export function Timeline({ pxPerSec, onSeek, cursorRef, tool }: Props) {
   const splitClip = useEditor((s) => s.splitClip);
   const removeMarker = useEditor((s) => s.removeMarker);
   const addClip = useEditor((s) => s.addClip);
+  const addClipNewTrack = useEditor((s) => s.addClipNewTrack);
   const toggleTrack = useEditor((s) => s.toggleTrack);
   const removeTrack = useEditor((s) => s.removeTrack);
   const renameTrack = useEditor((s) => s.renameTrack);
@@ -70,28 +72,33 @@ export function Timeline({ pxPerSec, onSeek, cursorRef, tool }: Props) {
   const laneW = Math.max(640, (dur + 4) * pxPerSec);
   const drag = useRef<{ id: string; mode: DragMode; kind: string; startX: number; origStart: number; origDur: number } | null>(null);
 
-  // snap a time to nearby clip edges / playhead / 0 (within SNAP_PX)
+  const pxRef = useRef(pxPerSec);
+  pxRef.current = pxPerSec;
+
+  // snap a time to nearby clip edges / playhead / markers / 0. Reads the store
+  // live + pxRef so it has a STABLE identity (deps []), which keeps the drag
+  // listeners alive across mid-drag re-renders.
   const snapTime = useCallback((t: number, selfId: string) => {
-    const thr = SNAP_PX / pxPerSec;
-    const points = [0, useEditor.getState().playhead];
-    for (const mk of doc.markers) points.push(mk.t);
-    for (const tr of doc.tracks) for (const c of tr.clips) { if (c.id === selfId) continue; points.push(c.start); points.push(c.start + c.duration); }
+    const thr = SNAP_PX / pxRef.current;
+    const st = useEditor.getState();
+    const points = [0, st.playhead];
+    for (const mk of st.doc.markers) points.push(mk.t);
+    for (const tr of st.doc.tracks) for (const c of tr.clips) { if (c.id === selfId) continue; points.push(c.start); points.push(c.start + c.duration); }
     let best = t; let bestD = thr;
     for (const p of points) { const d = Math.abs(p - t); if (d < bestD) { bestD = d; best = p; } }
     return best;
-  }, [doc, pxPerSec]);
+  }, []);
 
   const onPointerMove = useCallback((e: PointerEvent) => {
     const d = drag.current;
     if (!d) return;
-    const dt = (e.clientX - d.startX) / pxPerSec;
+    const dt = (e.clientX - d.startX) / pxRef.current;
     if (d.mode === 'move') {
       let start = Math.max(0, d.origStart + dt);
       const snappedStart = snapTime(start, d.id);
       const snappedEnd = snapTime(start + d.origDur, d.id) - d.origDur;
       start = Math.abs(snappedStart - start) <= Math.abs(snappedEnd - start) ? snappedStart : snappedEnd;
       start = Math.max(0, start);
-      // cross-track move onto a lane of the same kind
       const lane = (document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)?.closest('[data-trackid]') as HTMLElement | null;
       const destId = lane?.dataset.trackid;
       const destKind = lane?.dataset.kind;
@@ -102,15 +109,15 @@ export function Timeline({ pxPerSec, onSeek, cursorRef, tool }: Props) {
     } else {
       trimClip(d.id, 'right', snapTime(d.origStart + d.origDur + dt, d.id));
     }
-  }, [pxPerSec, moveClip, trimClip, snapTime]);
+  }, [moveClip, trimClip, snapTime]);
 
   const endDrag = useCallback(() => {
     drag.current = null;
+    useEditor.getState().endGesture();
     window.removeEventListener('pointermove', onPointerMove);
     window.removeEventListener('pointerup', endDrag);
   }, [onPointerMove]);
 
-  // safety: drop window listeners if we unmount mid-drag
   useEffect(() => () => {
     window.removeEventListener('pointermove', onPointerMove);
     window.removeEventListener('pointerup', endDrag);
@@ -126,6 +133,7 @@ export function Timeline({ pxPerSec, onSeek, cursorRef, tool }: Props) {
       splitClip(c.id, c.start + (e.clientX - rect.left) / pxPerSec);
       return;
     }
+    useEditor.getState().beginGesture(); // coalesce the whole drag into one undo step
     drag.current = { id: c.id, mode, kind, startX: e.clientX, origStart: c.start, origDur: c.duration };
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', endDrag);
@@ -144,10 +152,25 @@ export function Timeline({ pxPerSec, onSeek, cursorRef, tool }: Props) {
     let a: { kind: ClipKind; name: string; src: string; srcDuration: number; duration: number };
     try { a = JSON.parse(raw); } catch { return; }
     const wantKind = a.kind === 'audio' ? 'audio' : 'visual';
-    if (tr.kind !== wantKind || tr.locked) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    const t = Math.max(0, snapTime((e.clientX - rect.left) / pxPerSec, ''));
-    addClip(tr.id, makeClip(a.kind, { name: a.name, src: a.src, srcDuration: a.srcDuration, duration: a.kind === 'image' ? DEFAULTS.imageStill : a.duration, start: t }));
+    const t = Math.max(0, snapTime((e.clientX - rect.left) / pxRef.current, ''));
+    const clip = makeClip(a.kind, { name: a.name, src: a.src, srcDuration: a.srcDuration, duration: a.kind === 'image' ? DEFAULTS.imageStill : a.duration, start: t });
+    // drop on a matching track → add there; otherwise auto-create the right track
+    if (tr.kind === wantKind && !tr.locked) addClip(tr.id, clip);
+    else addClipNewTrack(wantKind, clip);
+  };
+
+  // drop onto the empty strip below the tracks → auto-create a track for it
+  const onDropNewTrack = (e: React.DragEvent) => {
+    const raw = e.dataTransfer.getData('application/al-asset');
+    if (!raw) return;
+    e.preventDefault();
+    let a: { kind: ClipKind; name: string; src: string; srcDuration: number; duration: number };
+    try { a = JSON.parse(raw); } catch { return; }
+    const wantKind = a.kind === 'audio' ? 'audio' : 'visual';
+    const rect = e.currentTarget.getBoundingClientRect();
+    const t = Math.max(0, snapTime((e.clientX - rect.left) / pxRef.current, ''));
+    addClipNewTrack(wantKind, makeClip(a.kind, { name: a.name, src: a.src, srcDuration: a.srcDuration, duration: a.kind === 'image' ? DEFAULTS.imageStill : a.duration, start: t }));
   };
 
   const step = pxPerSec < 14 ? 10 : pxPerSec < 30 ? 5 : pxPerSec < 70 ? 2 : 1;
@@ -198,6 +221,13 @@ export function Timeline({ pxPerSec, onSeek, cursorRef, tool }: Props) {
               </div>
             </div>
           ))}
+
+          <div className="al-cut__droptrack"
+               onDragOver={(e) => { if (e.dataTransfer.types.includes('application/al-asset')) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; (e.currentTarget as HTMLElement).classList.add('is-drop'); } }}
+               onDragLeave={(e) => (e.currentTarget as HTMLElement).classList.remove('is-drop')}
+               onDrop={(e) => { (e.currentTarget as HTMLElement).classList.remove('is-drop'); onDropNewTrack(e); }}>
+            <span>＋ {en ? 'Drop media here to add a track' : '把媒體拖到這裡自動新增軌道'}</span>
+          </div>
 
           <div ref={cursorRef} className="al-cut__playhead" />
         </div>

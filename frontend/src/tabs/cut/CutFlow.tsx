@@ -206,7 +206,7 @@ export function CutFlow() {
         </div>
       </div>
 
-      <Timeline pxPerSec={pxPerSec} onSeek={pb.seekTo} cursorRef={cursorRef} tool={tool} />
+      <Timeline pxPerSec={pxPerSec} onSeek={pb.seekTo} cursorRef={cursorRef} tool={tool} en={en} />
 
       <div ref={poolRef} className="al-cut__pool" aria-hidden="true" />
 

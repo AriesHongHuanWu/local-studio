@@ -54,6 +54,7 @@ interface EditorState {
   cancelGesture: () => void;
 
   addClip: (trackId: string, clip: Clip) => void;
+  addClipNewTrack: (kind: TrackKind, clip: Clip) => void;
   updateClip: (id: string, patch: Partial<Clip>) => void;
   updateFilters: (id: string, patch: Partial<Filters>) => void;
   moveClip: (id: string, newStart: number, newTrackId?: string) => void;
@@ -105,6 +106,8 @@ export const useEditor = create<EditorState>((set, get) => {
       const next = producer(s.doc);
       const patch: Partial<EditorState> = sel !== undefined ? { selectedId: sel } : {};
       if (next === s.doc) return patch;
+      // during a drag gesture the pre-drag snapshot is already on the stack — skip per-move history
+      if (s.gesturing) return { ...patch, doc: next };
       return { ...patch, doc: next, past: [...s.past, s.doc].slice(-80), future: [] };
     });
 
@@ -132,6 +135,15 @@ export const useEditor = create<EditorState>((set, get) => {
 
     addClip: (trackId, clip) =>
       apply((d) => ({ ...d, tracks: d.tracks.map((tr) => (tr.id === trackId ? { ...tr, clips: sortClips([...tr.clips, clip]) } : tr)) }), clip.id),
+
+    addClipNewTrack: (kind, clip) =>
+      apply((d) => {
+        const n = d.tracks.filter((t) => t.kind === kind).length + 1;
+        const name = kind === 'visual' ? `V${n}` : kind === 'audio' ? `A${n}` : `Text ${n}`;
+        const track: Track = { id: uid('trk'), kind, name, muted: false, hidden: false, locked: false, clips: [clip] };
+        const tracks = kind === 'text' ? [track, ...d.tracks] : kind === 'audio' ? [...d.tracks, track] : insertVisual(d.tracks, track);
+        return { ...d, tracks };
+      }, clip.id),
 
     updateClip: (id, patch) => apply((d) => mapClip(d, id, (c) => ({ ...c, ...patch }))),
     updateFilters: (id, patch) => apply((d) => mapClip(d, id, (c) => ({ ...c, filters: { ...c.filters, ...patch } }))),

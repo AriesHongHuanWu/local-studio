@@ -1,15 +1,13 @@
-# Local Studio v0.1.50
+# Local Studio v0.1.51
 
-## 🎤 Forced-aligned KARAOKE captions — the editor feature no other NLE has
+## ✋ Editor fixes — clips now move, drops make tracks
 
-Run **Auto caption** on any clip and the captions now come back **word-by-word, forced-aligned** — each word **lights up exactly as it's sung** (a true karaoke / lyric-video look), generated **100% locally** (Whisper + alignment) and **baked into your export** pixel-exact. CapCut gates this behind a cloud account; Resolve/Premiere don't have it at all.
+Big usability fixes for the Editor (剪輯室):
 
-- Word-level highlight sweeps across the line as the vocal plays.
-- Pick the **sung colour**; toggle karaoke on/off per caption (文字 tab).
-- Works with all the premium caption styles, animations and the GPU export.
+- **Clips slide freely now.** A bug froze a clip (or subtitle) after the first pixel of a drag — fixed. Move and trim clips smoothly along the timeline, and one drag = one clean undo.
+- **Drag media straight onto the timeline** — drop it where you want it. Drop onto an empty area (or the new "**＋ drop to add a track**" strip) and the **right track is created automatically** — no more manually adding tracks first. Drop a video onto an audio lane and it makes a video track for you.
+- **Tidier media bin** — imports now lay out in a clean 2-column grid instead of one long messy list.
 
-This is the first of the "better than CapCut" wave — a music-producer's AI editor. Next up the roadmap: a Fairlight-style mixer feeding **AI mastering**, **stem separation** on the timeline, **adjustment layers + color wheels + scopes**, and **AI object/watermark removal**.
-
-Everything from v0.1.49 (CapCut tabbed library, drag-to-timeline, WAV export) is included.
+Everything from v0.1.50 (karaoke captions, CapCut tabbed layout, GPU export) is included.
 
 MIT © 2026 Aries HongHuan Wu · ☕ [Ko-fi](https://ko-fi.com/arieswu) · [PayPal](https://paypal.me/Arieshonghuan)
