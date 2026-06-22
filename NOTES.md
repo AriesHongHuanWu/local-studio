@@ -1,13 +1,14 @@
-# Local Studio v0.1.51
+# Local Studio v0.1.52
 
-## ✋ Editor fixes — clips now move, drops make tracks
+## 🎛️ A pro effects workflow — drag to apply, manage the stack
 
-Big usability fixes for the Editor (剪輯室):
+Reworked how effects work in the Editor to match a real NLE:
 
-- **Clips slide freely now.** A bug froze a clip (or subtitle) after the first pixel of a drag — fixed. Move and trim clips smoothly along the timeline, and one drag = one clean undo.
-- **Drag media straight onto the timeline** — drop it where you want it. Drop onto an empty area (or the new "**＋ drop to add a track**" strip) and the **right track is created automatically** — no more manually adding tracks first. Drop a video onto an audio lane and it makes a video track for you.
-- **Tidier media bin** — imports now lay out in a clean 2-column grid instead of one long messy list.
+- **Drag to apply.** Grab a **filter / effect / transition** from the left library and **drop it onto a clip** — the way CapCut / Premiere / Resolve work. (Selecting a clip and clicking still works too.)
+- **Applied-effects stack.** Select a clip and the right panel now lists **everything applied to it** — filter, glitch, scanlines, shake, chroma, mask, transition, frame, keyframes, karaoke — each as a chip you can **remove with one click**. No more hunting through sliders to find what's on a clip.
 
-Everything from v0.1.50 (karaoke captions, CapCut tabbed layout, GPU export) is included.
+Together with the v0.1.51 fix (clips now slide and trim properly, drops auto-create tracks), the editor finally *behaves* like professional software.
+
+Next: transitions placed **on the cut** between two clips, and an **effects / adjustment-layer track**.
 
 MIT © 2026 Aries HongHuan Wu · ☕ [Ko-fi](https://ko-fi.com/arieswu) · [PayPal](https://paypal.me/Arieshonghuan)

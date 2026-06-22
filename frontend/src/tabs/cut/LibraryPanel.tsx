@@ -56,11 +56,6 @@ export function LibraryPanel({ en, getTime }: Props) {
     { key: 'trans', icon: Shuffle, zh: '轉場', en: 'Transitions' },
   ];
 
-  const needSel = (kind: 'media' | 'any') => (
-    <p className="al-cut__libhint">{kind === 'media'
-      ? (en ? 'Select a video or image clip first.' : '先選一個影片或圖片片段。')
-      : (en ? 'Select a clip first.' : '先選一個片段。')}</p>
-  );
 
   return (
     <div className="al-cut__lib">
@@ -94,10 +89,12 @@ export function LibraryPanel({ en, getTime }: Props) {
 
         {tab === 'filter' && (
           <>
-            {!isMediaSel && needSel('media')}
+            <p className="al-cut__libhint">{en ? 'Drag onto a clip, or select a clip and click.' : '拖到片段上,或選片段後點擊。'}</p>
             <div className="al-cut__libgrid">
               {LOOKS.map((l) => (
-                <button key={l.key} type="button" className="al-cut__libcard" disabled={!isMediaSel} onClick={() => applyFilters(l.f)}>
+                <button key={l.key} type="button" className="al-cut__libcard" draggable
+                  onDragStart={(e) => { e.dataTransfer.setData('application/al-fx', JSON.stringify({ kind: 'filter', f: l.f })); e.dataTransfer.effectAllowed = 'copy'; }}
+                  onClick={() => applyFilters(l.f)}>
                   <span className="al-cut__libcardsw" data-look={l.key} />
                   <span className="al-cut__libcardlbl">{en ? l.en : l.label}</span>
                 </button>
@@ -108,10 +105,12 @@ export function LibraryPanel({ en, getTime }: Props) {
 
         {tab === 'fx' && (
           <>
-            {!sel && needSel('any')}
+            <p className="al-cut__libhint">{en ? 'Drag onto a clip, or select a clip and click.' : '拖到片段上,或選片段後點擊。'}</p>
             <div className="al-cut__libgrid">
               {FX.map((f) => (
-                <button key={f.key} type="button" className="al-cut__libcard" disabled={!sel} onClick={() => applyClip(f.patch)}>
+                <button key={f.key} type="button" className="al-cut__libcard" draggable
+                  onDragStart={(e) => { e.dataTransfer.setData('application/al-fx', JSON.stringify({ kind: 'fx', patch: f.patch })); e.dataTransfer.effectAllowed = 'copy'; }}
+                  onClick={() => applyClip(f.patch)}>
                   <Sparkles size={18} />
                   <span className="al-cut__libcardlbl">{en ? f.en : f.zh}</span>
                 </button>
@@ -122,10 +121,12 @@ export function LibraryPanel({ en, getTime }: Props) {
 
         {tab === 'trans' && (
           <>
-            {!sel && needSel('any')}
+            <p className="al-cut__libhint">{en ? 'Drag onto a clip, or select a clip and click.' : '拖到片段上,或選片段後點擊。'}</p>
             <div className="al-cut__libgrid">
               {TRANSITIONS.filter((t) => t.key !== 'none').map((t) => (
-                <button key={t.key} type="button" className="al-cut__libcard" disabled={!sel} onClick={() => applyTrans(t.key)}>
+                <button key={t.key} type="button" className="al-cut__libcard" draggable
+                  onDragStart={(e) => { e.dataTransfer.setData('application/al-fx', JSON.stringify({ kind: 'trans', type: t.key })); e.dataTransfer.effectAllowed = 'copy'; }}
+                  onClick={() => applyTrans(t.key)}>
                   <Shuffle size={18} />
                   <span className="al-cut__libcardlbl">{en ? t.en : t.label}</span>
                 </button>

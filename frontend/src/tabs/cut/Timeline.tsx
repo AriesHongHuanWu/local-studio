@@ -160,6 +160,24 @@ export function Timeline({ pxPerSec, onSeek, cursorRef, tool, en }: Props) {
     else addClipNewTrack(wantKind, clip);
   };
 
+  // drop a filter / effect / transition from the library onto a clip → apply it there
+  const onDropFx = (e: React.DragEvent, c: Clip) => {
+    const raw = e.dataTransfer.getData('application/al-fx');
+    if (!raw) return;
+    e.preventDefault();
+    e.stopPropagation();
+    let fx: { kind: string; f?: Clip['filters']; patch?: Partial<Clip>; type?: string };
+    try { fx = JSON.parse(raw); } catch { return; }
+    const st = useEditor.getState();
+    if (fx.kind === 'filter' && fx.f) st.updateFilters(c.id, fx.f);
+    else if (fx.kind === 'fx' && fx.patch) st.updateClip(c.id, fx.patch);
+    else if (fx.kind === 'trans' && fx.type) {
+      st.setTransition(c.id, 'transIn', { type: fx.type as Clip['transIn']['type'], dur: 0.6 });
+      st.setTransition(c.id, 'transOut', { type: fx.type as Clip['transOut']['type'], dur: 0.6 });
+    }
+    st.select(c.id);
+  };
+
   // drop onto the empty strip below the tracks → auto-create a track for it
   const onDropNewTrack = (e: React.DragEvent) => {
     const raw = e.dataTransfer.getData('application/al-asset');
@@ -205,7 +223,10 @@ export function Timeline({ pxPerSec, onSeek, cursorRef, tool, en }: Props) {
                   return (
                     <div key={c.id} className={`al-cut__clip${sel ? ' is-sel' : ''}${tr.locked ? ' is-locked' : ''}`}
                          style={{ left: c.start * pxPerSec, width: w }}
-                         onPointerDown={(e) => startDrag(e, c, 'move', tr.kind, tr.locked)} title={c.name}>
+                         onPointerDown={(e) => startDrag(e, c, 'move', tr.kind, tr.locked)} title={c.name}
+                         onDragOver={(e) => { if (e.dataTransfer.types.includes('application/al-fx')) { e.preventDefault(); e.stopPropagation(); (e.currentTarget as HTMLElement).classList.add('is-fxdrop'); } }}
+                         onDragLeave={(e) => (e.currentTarget as HTMLElement).classList.remove('is-fxdrop')}
+                         onDrop={(e) => { (e.currentTarget as HTMLElement).classList.remove('is-fxdrop'); onDropFx(e, c); }}>
                       {(c.kind === 'audio' || c.kind === 'video') && c.src && c.srcDuration > 0 && (
                         <ClipWave src={c.src} inPoint={c.inPoint} dur={c.duration} speed={c.speed} srcDuration={c.srcDuration} width={w} />
                       )}

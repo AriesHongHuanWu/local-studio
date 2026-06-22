@@ -9,7 +9,26 @@ import { useState } from 'react';
 import { Copy, Scissors, Trash2, Clipboard, Diamond, FlipHorizontal2, FlipVertical2 } from 'lucide-react';
 import { useEditor } from './useEditor';
 import { LOOKS, TRANSITIONS, TEXT_ANIMS, BLEND_MODES, FONTS, TEXT_PRESETS, SHAKES, KEN_BURNS, kenBurns } from './effects';
+import { neutralFilters } from './types';
 import type { Clip } from './types';
+
+/** The list of effects currently applied to a clip, each with a "clear" patch. */
+function activeEffects(c: Clip, en: boolean): { key: string; label: string; clear: Partial<Clip> }[] {
+  const out: { key: string; label: string; clear: Partial<Clip> }[] = [];
+  const f = c.filters;
+  if (f.brightness !== 1 || f.contrast !== 1 || f.saturate !== 1 || f.hue !== 0 || f.blur !== 0 || f.sepia !== 0 || f.grayscale !== 0 || f.invert !== 0)
+    out.push({ key: 'filter', label: en ? 'Filter' : '濾鏡', clear: { filters: neutralFilters() } });
+  if (c.glitch > 0) out.push({ key: 'glitch', label: en ? 'Glitch' : '故障', clear: { glitch: 0 } });
+  if (c.scan > 0) out.push({ key: 'scan', label: en ? 'Scanlines' : '掃描線', clear: { scan: 0 } });
+  if (c.shake.mode !== 'none') out.push({ key: 'shake', label: en ? 'Shake' : '晃動', clear: { shake: { mode: 'none', amount: 0.3, speed: 1 } } });
+  if (c.chroma.on) out.push({ key: 'chroma', label: en ? 'Chroma' : '去背', clear: { chroma: { ...c.chroma, on: false } } });
+  if (c.mask !== 'none') out.push({ key: 'mask', label: en ? 'Mask' : '遮罩', clear: { mask: 'none' } });
+  if (c.transIn.type !== 'none' || c.transOut.type !== 'none') out.push({ key: 'trans', label: en ? 'Transition' : '轉場', clear: { transIn: { type: 'none', dur: 0.5 }, transOut: { type: 'none', dur: 0.5 } } });
+  if (c.frame.shadow > 0 || c.frame.border > 0 || c.frame.radius > 0) out.push({ key: 'frame', label: en ? 'Frame' : '外框', clear: { frame: { shadow: 0, border: 0, borderColor: c.frame.borderColor, radius: 0 } } });
+  if (c.keys.length > 0) out.push({ key: 'keys', label: en ? 'Keyframes' : '關鍵影格', clear: { keys: [] } });
+  if (c.kind === 'text' && c.karaoke) out.push({ key: 'karaoke', label: en ? 'Karaoke' : '卡拉OK', clear: { karaoke: false } });
+  return out;
+}
 
 interface Props {
   en: boolean;
@@ -78,6 +97,20 @@ export function Inspector({ en, onSplit, getTime }: Props) {
         <button type="button" className="al-btn al-btn--ghost al-btn--sm" onClick={() => copyClip(c.id)}><Clipboard size={12} /></button>
         <button type="button" className="al-btn al-btn--danger al-btn--sm" onClick={() => removeClip(c.id)}><Trash2 size={12} /></button>
       </div>
+
+      {(() => {
+        const fx = activeEffects(c, en);
+        return fx.length > 0 ? (
+          <div className="al-cut__fxstack">
+            <span className="al-cut__rowlabel">{en ? 'Applied effects' : '已套用特效'}</span>
+            <div className="al-cut__fxlist">
+              {fx.map((e) => (
+                <span key={e.key} className="al-cut__fxchip">{e.label}<button type="button" onClick={() => up(e.clear)} title={en ? 'remove' : '移除'}>×</button></span>
+              ))}
+            </div>
+          </div>
+        ) : null;
+      })()}
 
       <div className="al-cut__insptabs">
         {tabs.map((tk) => (

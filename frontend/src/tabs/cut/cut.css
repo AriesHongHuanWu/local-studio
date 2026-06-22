@@ -287,3 +287,11 @@
 .al-cut__binhint { grid-column: 1 / -1; }
 .al-cut__assetadd { border-radius: 8px !important; border-right: 1px solid var(--al-line, #2a2a36) !important; }
 .al-cut__asset { border-radius: 8px; overflow: hidden; }
+
+/* ── Wave 8: drag-to-apply effects + applied-effects stack ─────── */
+.al-cut__clip.is-fxdrop { outline: 2px solid var(--al-gold, #d8a657); box-shadow: 0 0 14px rgba(216,166,87,.55); z-index: 3; }
+.al-cut__fxstack { display: flex; flex-direction: column; gap: 5px; padding-bottom: 6px; border-bottom: 1px solid var(--al-line, #2a2a36); }
+.al-cut__fxlist { display: flex; flex-wrap: wrap; gap: 4px; }
+.al-cut__fxchip { display: inline-flex; align-items: center; gap: 3px; padding: 3px 3px 3px 8px; border-radius: 6px; font-size: 11px; border: 1px solid var(--al-gold, #d8a657); color: var(--al-gold, #d8a657); background: rgba(216,166,87,.08); }
+.al-cut__fxchip button { border: none; background: transparent; color: var(--al-gold, #d8a657); cursor: pointer; font-size: 13px; line-height: 1; padding: 0 2px; }
+.al-cut__fxchip button:hover { color: var(--al-error, #e06c75); }
