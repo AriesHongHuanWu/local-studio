@@ -7,9 +7,6 @@ Independent artists end up stitching together a cloud mastering service, a subti
 - Landing page: **https://arieshonghuanwu.github.io/local-studio/**
 - Installers: [Releases](https://github.com/AriesHongHuanWu/local-studio/releases) (Windows NSIS, macOS dmg, Linux deb/AppImage)
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![CI](https://github.com/AriesHongHuanWu/local-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/AriesHongHuanWu/local-studio/actions/workflows/ci.yml)
-
 The repository contains no screenshots. `examples/` contains real exporter output (LRC, SRT, ASS, JSON) for a hand-authored demo result, so you can see the exact file formats the app writes without installing anything.
 
 ## How it works
