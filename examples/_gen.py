@@ -90,9 +90,37 @@ RESULT = {
     },
 }
 
-(EX / "demo.lrc.line.tmp").write_text(export.to_lrc(RESULT, "line"), encoding="utf-8")
-(EX / "demo.lrc.word.tmp").write_text(export.to_lrc(RESULT, "word"), encoding="utf-8")
+
+# demo.lrc carries both LRC levels in one file: the standard line-level block
+# and the enhanced word-level block, under the usual LRC metadata header.
+# Both blocks come straight from export.to_lrc(); only the header and the two
+# "#" comment lines are added here.
+LRC_HEADER = "\n".join([
+    "[ti:Demo Verse]",
+    "[ar:AutoLyrics demo clip]",
+    "[al:LocalAiLyrics examples]",
+    "[by:AutoLyrics (LocalAiLyrics)]",
+    "[re:AutoLyrics - local-first lyric alignment]",
+    "[la:en]",
+])
+LINE_NOTE = "# --- Standard line-level LRC (one [mm:ss.xx] tag per line) -------------------"
+WORD_NOTE = (
+    "# --- Enhanced word-level LRC (per-word <mm:ss.xx> tags = the gold sweep) ------\n"
+    "# Players that support enhanced LRC highlight each word as it is sung."
+)
+
+LRC = "\n".join([
+    LRC_HEADER,
+    "",
+    LINE_NOTE,
+    export.to_lrc(RESULT, "line").rstrip("\n"),
+    "",
+    WORD_NOTE,
+    export.to_lrc(RESULT, "word").rstrip("\n"),
+]) + "\n"
+
+(EX / "demo.lrc").write_text(LRC, encoding="utf-8")
 (EX / "demo.srt").write_text(export.to_srt(RESULT), encoding="utf-8")
 (EX / "demo.ass").write_text(export.to_ass(RESULT, True), encoding="utf-8")
 (EX / "demo.json").write_text(export.to_json(RESULT) + "\n", encoding="utf-8")
-print("generated")
+print("generated: demo.lrc demo.srt demo.ass demo.json")

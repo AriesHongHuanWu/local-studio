@@ -24,6 +24,10 @@ backend/jobs/
 *.lrc
 *.srt
 *.ass
+# ...but the committed sample exports under examples/ are not scratch.
+!examples/*.lrc
+!examples/*.srt
+!examples/*.ass
 
 # ── Frontend (React + Vite) ─────────────────────────────────────
 frontend/node_modules/

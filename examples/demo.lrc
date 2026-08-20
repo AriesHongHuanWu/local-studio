@@ -1,0 +1,23 @@
+[ti:Demo Verse]
+[ar:AutoLyrics demo clip]
+[al:LocalAiLyrics examples]
+[by:AutoLyrics (LocalAiLyrics)]
+[re:AutoLyrics - local-first lyric alignment]
+[la:en]
+
+# --- Standard line-level LRC (one [mm:ss.xx] tag per line) -------------------
+[00:09.20]Morning light across the bay
+[00:12.60]Soft and slow we drift away
+[00:15.90]Hum a tune the river knows
+[00:19.40]Watch how every ripple grows
+[00:22.85]Carry me where breezes call
+[00:26.20]Open skies above us all
+
+# --- Enhanced word-level LRC (per-word <mm:ss.xx> tags = the gold sweep) ------
+# Players that support enhanced LRC highlight each word as it is sung.
+[00:09.20]<00:09.20>Morning<00:09.80>light<00:10.30>across<00:10.80>the<00:11.12>bay<00:12.10>
+[00:12.60]<00:12.60>Soft<00:13.08>and<00:13.42>slow<00:13.92>we<00:14.26>drift<00:14.84>away<00:15.40>
+[00:15.90]<00:15.90>Hum<00:16.36>a<00:16.64>tune<00:17.10>the<00:17.46>river<00:18.04>knows<00:18.85>
+[00:19.40]<00:19.40>Watch<00:19.90>how<00:20.22>every<00:20.80>ripple<00:21.40>grows<00:22.30>
+[00:22.85]<00:22.85>Carry<00:23.40>me<00:23.72>where<00:24.16>breezes<00:24.84>call<00:25.70>
+[00:26.20]<00:26.20>Open<00:26.80>skies<00:27.22>above<00:27.76>us<00:28.12>all<00:29.60>
