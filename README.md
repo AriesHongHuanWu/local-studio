@@ -4,8 +4,8 @@ A local-first desktop studio for musicians and video creators: audio mastering, 
 
 Independent artists end up stitching together a cloud mastering service, a subtitle site, a lyric-timing tool and a video editor, each with its own account, upload step and minute quota. Local Studio packages the same jobs into one desktop app whose media processing happens locally: audio and video files are read from disk, processed by a Python backend bound to `127.0.0.1`, and written back to disk. It is a solo project, built as a Tauri v2 desktop shell around a FastAPI service, and it is the app I use for my own releases.
 
-Landing page: **https://arieshonghuanwu.github.io/local-studio/**
-Installers: [Releases](https://github.com/AriesHongHuanWu/local-studio/releases) (Windows NSIS, macOS dmg, Linux deb/AppImage)
+- Landing page: **https://arieshonghuanwu.github.io/local-studio/**
+- Installers: [Releases](https://github.com/AriesHongHuanWu/local-studio/releases) (Windows NSIS, macOS dmg, Linux deb/AppImage)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![CI](https://github.com/AriesHongHuanWu/local-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/AriesHongHuanWu/local-studio/actions/workflows/ci.yml)
